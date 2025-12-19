@@ -1,0 +1,2998 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Korean-English Translator</title>
+
+  <style>
+    /* ========================================
+       CSS Reset & Base Styles
+       ======================================== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      /* Colors */
+      --primary: #3b82f6;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --bg-primary: #ffffff;
+      --bg-secondary: #f3f4f6;
+      --text-primary: #111827;
+      --text-secondary: #6b7280;
+      --border: #e5e7eb;
+
+      /* Spacing */
+      --spacing-xs: 4px;
+      --spacing-sm: 8px;
+      --spacing-md: 16px;
+      --spacing-lg: 24px;
+      --spacing-xl: 32px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-secondary);
+      color: var(--text-primary);
+      line-height: 1.6;
+    }
+
+    /* ========================================
+       Layout & Grid
+       ======================================== */
+    #app {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: var(--spacing-lg);
+    }
+
+    .app-header {
+      text-align: center;
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .app-header h1 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    /* ========================================
+       Tab Navigation
+       ======================================== */
+    .tabs {
+      display: flex;
+      gap: var(--spacing-sm);
+      background-color: var(--bg-primary);
+      border-radius: 8px;
+      padding: var(--spacing-sm);
+      margin-bottom: var(--spacing-lg);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: var(--spacing-md);
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      background-color: var(--bg-secondary);
+    }
+
+    .tab-btn.active {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    /* ========================================
+       Tab Content
+       ======================================== */
+    .tab-content {
+      display: none;
+      background-color: var(--bg-primary);
+      border-radius: 8px;
+      padding: var(--spacing-lg);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      min-height: 500px;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* ========================================
+       Components - Buttons
+       ======================================== */
+    .btn {
+      padding: var(--spacing-md) var(--spacing-lg);
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: #2563eb;
+    }
+
+    .btn-secondary {
+      background-color: var(--bg-secondary);
+      color: var(--text-primary);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background-color: var(--border);
+    }
+
+    .btn-danger {
+      background-color: var(--error);
+      color: white;
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background-color: #dc2626;
+    }
+
+    .btn-sm {
+      padding: var(--spacing-sm) var(--spacing-md);
+      font-size: 12px;
+    }
+
+    .btn-icon {
+      padding: var(--spacing-sm);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: all 0.2s;
+    }
+
+    .btn-icon:hover {
+      background-color: var(--bg-secondary);
+    }
+
+    /* ========================================
+       Components - Form Controls
+       ======================================== */
+    textarea, input[type="text"], input[type="password"], select {
+      width: 100%;
+      padding: var(--spacing-md);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+
+    textarea:focus, input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 120px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: var(--spacing-sm);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    select {
+      cursor: pointer;
+      background-color: white;
+    }
+
+    /* ========================================
+       Components - Loading Indicator
+       ======================================== */
+    .loading-indicator {
+      text-align: center;
+      padding: var(--spacing-lg);
+      color: var(--text-secondary);
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(0, 0, 0, 0.1);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: var(--spacing-sm);
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* ========================================
+       Components - Toast Notifications
+       ======================================== */
+    #toast-container {
+      position: fixed;
+      top: var(--spacing-lg);
+      right: var(--spacing-lg);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-sm);
+    }
+
+    .toast {
+      padding: var(--spacing-md) var(--spacing-lg);
+      border-radius: 6px;
+      color: white;
+      font-size: 14px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      animation: slideIn 0.3s ease-out;
+      min-width: 250px;
+    }
+
+    .toast.fade-out {
+      animation: fadeOut 0.3s ease-out;
+    }
+
+    .toast-success { background-color: var(--success); }
+    .toast-error { background-color: var(--error); }
+    .toast-warning { background-color: var(--warning); }
+    .toast-info { background-color: var(--primary); }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes fadeOut {
+      from {
+        opacity: 1;
+      }
+      to {
+        opacity: 0;
+      }
+    }
+
+    /* ========================================
+       Tab 1: Translation
+       ======================================== */
+    .translate-container {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-lg);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--spacing-md);
+    }
+
+    .input-section, .output-section {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-sm);
+    }
+
+    .output-box {
+      padding: var(--spacing-md);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      min-height: 120px;
+      background-color: var(--bg-secondary);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: var(--spacing-sm);
+    }
+
+    /* ========================================
+       Tab 2: History
+       ======================================== */
+    .history-controls {
+      display: flex;
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-lg);
+      flex-wrap: wrap;
+    }
+
+    .history-controls input {
+      flex: 2;
+      min-width: 200px;
+    }
+
+    .history-controls select {
+      flex: 1;
+      min-width: 150px;
+    }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .history-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: var(--spacing-md);
+      transition: all 0.3s ease;
+    }
+
+    .history-card:hover {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      border-color: var(--primary);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--spacing-sm);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .card-header .timestamp {
+      font-weight: 500;
+    }
+
+    .card-header .badges {
+      display: flex;
+      gap: var(--spacing-xs);
+    }
+
+    .badge {
+      background-color: var(--bg-secondary);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .badge.category {
+      background-color: #dbeafe;
+      color: #1e40af;
+    }
+
+    .card-body {
+      margin-bottom: var(--spacing-md);
+    }
+
+    .card-body .korean-text {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: var(--spacing-xs);
+      line-height: 1.5;
+    }
+
+    .card-body .english-text {
+      font-size: 14px;
+      color: var(--text-secondary);
+      padding-left: var(--spacing-md);
+      border-left: 3px solid var(--primary);
+      line-height: 1.5;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: var(--spacing-sm);
+      justify-content: flex-end;
+    }
+
+    .btn-icon {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: all 0.2s;
+    }
+
+    .btn-icon:hover {
+      background-color: var(--bg-secondary);
+      border-color: var(--primary);
+    }
+
+    .btn-icon.active {
+      background-color: #fef3c7;
+      border-color: var(--warning);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: var(--spacing-xl);
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    #load-more-btn {
+      width: 100%;
+      margin-top: var(--spacing-md);
+      display: none;
+    }
+
+    /* Export Dropdown Menu */
+    .export-menu {
+      position: fixed;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+      min-width: 200px;
+    }
+
+    .export-menu button {
+      display: block;
+      width: 100%;
+      padding: var(--spacing-sm) var(--spacing-md);
+      border: none;
+      background: none;
+      text-align: left;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s;
+    }
+
+    .export-menu button:hover {
+      background-color: var(--bg-secondary);
+    }
+
+    .export-menu button:first-child {
+      border-radius: 6px 6px 0 0;
+    }
+
+    .export-menu button:last-child {
+      border-radius: 0 0 6px 6px;
+    }
+
+    .history-card {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: var(--spacing-md);
+      transition: box-shadow 0.2s;
+    }
+
+    .history-card:hover {
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: var(--spacing-sm);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .badges {
+      display: flex;
+      gap: var(--spacing-sm);
+    }
+
+    .badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      background-color: var(--bg-secondary);
+      font-size: 11px;
+    }
+
+    .card-body {
+      margin-bottom: var(--spacing-md);
+    }
+
+    .korean-text {
+      font-size: 14px;
+      color: var(--text-primary);
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .english-text {
+      font-size: 14px;
+      color: var(--text-secondary);
+      padding-left: var(--spacing-md);
+      border-left: 3px solid var(--primary);
+    }
+
+    .card-actions {
+      display: flex;
+      gap: var(--spacing-sm);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: var(--spacing-xl);
+      color: var(--text-secondary);
+    }
+
+    /* ========================================
+       Tab 3: Settings
+       ======================================== */
+    .settings-section {
+      margin-bottom: var(--spacing-xl);
+      padding-bottom: var(--spacing-lg);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .settings-section:last-child {
+      border-bottom: none;
+    }
+
+    .settings-section h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: var(--spacing-md);
+    }
+
+    .api-key-input {
+      display: grid;
+      grid-template-columns: 150px 1fr auto auto;
+      gap: var(--spacing-sm);
+      align-items: center;
+      margin-bottom: var(--spacing-md);
+    }
+
+    .setting-item {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-md);
+    }
+
+    .setting-item label {
+      margin: 0;
+      flex: 1;
+    }
+
+    .setting-item select {
+      flex: 2;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-md);
+    }
+
+    .stats p {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .stats strong {
+      color: var(--text-primary);
+      font-size: 18px;
+    }
+
+    .warning {
+      padding: var(--spacing-md);
+      background-color: #fef3c7;
+      border-left: 4px solid var(--warning);
+      border-radius: 4px;
+      margin-bottom: var(--spacing-md);
+      font-size: 14px;
+      color: #92400e;
+    }
+
+    /* ========================================
+       Modal
+       ======================================== */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+
+    .modal-content {
+      background-color: white;
+      border-radius: 8px;
+      padding: var(--spacing-lg);
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal h3 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: var(--spacing-md);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: var(--spacing-sm);
+      margin-top: var(--spacing-lg);
+      justify-content: flex-end;
+    }
+
+    .similar-item {
+      padding: var(--spacing-md);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: var(--spacing-sm);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .similar-item:hover {
+      background-color: var(--bg-secondary);
+    }
+
+    .similar-item.selected {
+      border-color: var(--primary);
+      background-color: #eff6ff;
+    }
+
+    .similarity-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      background-color: var(--primary);
+      color: white;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-bottom: var(--spacing-sm);
+    }
+
+    /* ========================================
+       Modal Styles
+       ======================================== */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.hidden {
+      display: none;
+    }
+
+    .modal-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1001;
+    }
+
+    .modal-content {
+      position: relative;
+      background: white;
+      border-radius: 8px;
+      padding: var(--spacing-xl);
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      z-index: 1002;
+    }
+
+    .modal-content h3 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: var(--spacing-md);
+      color: var(--text-primary);
+    }
+
+    .modal-content p {
+      color: var(--text-secondary);
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .similar-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .similar-item {
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: var(--spacing-md);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .similar-item:hover {
+      border-color: var(--primary);
+      background-color: var(--bg-secondary);
+    }
+
+    .similar-item.selected {
+      border-color: var(--primary);
+      background-color: #e3f2fd;
+    }
+
+    .similarity-badge {
+      display: inline-block;
+      background-color: var(--success);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .similarity-content .korean-text {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .similarity-content .english-text {
+      font-size: 14px;
+      color: var(--text-secondary);
+      padding-left: var(--spacing-md);
+      border-left: 3px solid var(--primary);
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .meta-info {
+      display: flex;
+      gap: var(--spacing-sm);
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .model-badge, .style-badge {
+      background-color: var(--bg-secondary);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: var(--spacing-md);
+      justify-content: flex-end;
+    }
+
+    /* ========================================
+       Responsive Design
+       ======================================== */
+    @media (max-width: 768px) {
+      #app {
+        padding: var(--spacing-md);
+      }
+
+      .tabs {
+        flex-direction: column;
+      }
+
+      .controls {
+        grid-template-columns: 1fr;
+      }
+
+      .history-controls {
+        flex-direction: column;
+      }
+
+      .api-key-input {
+        grid-template-columns: 1fr;
+      }
+
+      .api-key-input label {
+        margin-bottom: var(--spacing-sm);
+      }
+
+      .action-buttons {
+        flex-wrap: wrap;
+      }
+
+      #toast-container {
+        left: var(--spacing-md);
+        right: var(--spacing-md);
+      }
+    }
+
+    @media (min-width: 769px) and (max-width: 1024px) {
+      #app {
+        max-width: 90%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="app-header">
+      <h1>🌐 Korean → English Translator</h1>
+    </div>
+
+    <!-- Tab Navigation -->
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="translate">번역</button>
+      <button class="tab-btn" data-tab="history">히스토리</button>
+      <button class="tab-btn" data-tab="settings">설정</button>
+    </nav>
+
+    <!-- Tab 1: Translation -->
+    <div id="translate-tab" class="tab-content active">
+      <div class="translate-container">
+        <div class="controls">
+          <div>
+            <label>모델:</label>
+            <select id="model-select">
+              <option value="gemini-2.5-flash-lite" selected>Gemini 2.5 Flash Lite</option>
+              <option value="gemini-3.0-flash">Gemini 3.0 Flash</option>
+              <option value="gpt-4o-mini">GPT-4o-mini</option>
+            </select>
+          </div>
+
+          <div>
+            <label>스타일:</label>
+            <select id="style-select">
+              <option value="casual-work" selected>캐주얼 업무용</option>
+              <option value="formal-work">격식있는 업무용</option>
+              <option value="very-casual">매우 캐주얼</option>
+              <option value="technical-doc">기술 문서용</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="input-section">
+          <label>한국어 입력:</label>
+          <textarea id="korean-input" placeholder="번역할 텍스트를 입력하세요... (Enter로 번역, Shift+Enter로 줄바꿈)"></textarea>
+        </div>
+
+        <button id="translate-btn" class="btn btn-primary">번역하기</button>
+
+        <div id="loading-indicator" class="loading-indicator hidden">
+          <span class="spinner"></span> 번역 중...
+        </div>
+
+        <div id="result-section" class="hidden">
+          <div class="output-section">
+            <label>영어 결과:</label>
+            <div id="english-output" class="output-box"></div>
+          </div>
+
+          <div class="action-buttons">
+            <button id="copy-btn" class="btn btn-secondary">📋 복사</button>
+            <button id="favorite-btn" class="btn btn-secondary">⭐ 즐겨찾기</button>
+            <button id="delete-btn" class="btn btn-danger">🗑️ 삭제</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: History -->
+    <div id="history-tab" class="tab-content">
+      <div class="history-controls">
+        <input type="text" id="search-input" placeholder="🔍 검색...">
+
+        <select id="filter-category">
+          <option value="">모든 카테고리</option>
+          <option value="Code Review">Code Review</option>
+          <option value="Bug Report">Bug Report</option>
+          <option value="Feature Discussion">Feature Discussion</option>
+          <option value="Meeting Schedule">Meeting Schedule</option>
+          <option value="Question">Question</option>
+          <option value="Update/Status">Update/Status</option>
+          <option value="Casual Chat">Casual Chat</option>
+          <option value="Other">Other</option>
+        </select>
+
+        <select id="filter-model">
+          <option value="">모든 모델</option>
+          <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+          <option value="gemini-3.0-flash">Gemini 3.0 Flash</option>
+          <option value="gpt-4o-mini">GPT-4o-mini</option>
+        </select>
+
+        <select id="sort-by">
+          <option value="newest">최신순</option>
+          <option value="oldest">오래된순</option>
+          <option value="alphabetical">가나다순</option>
+        </select>
+
+        <button id="export-btn" class="btn btn-secondary">내보내기 ▼</button>
+      </div>
+
+      <div id="history-list" class="history-list">
+        <!-- History items will be rendered here -->
+      </div>
+
+      <button id="load-more-btn" class="btn btn-secondary hidden" style="width: 100%; margin-top: 16px;">더 보기</button>
+    </div>
+
+    <!-- Tab 3: Settings -->
+    <div id="settings-tab" class="tab-content">
+      <section class="settings-section">
+        <h3>API Keys</h3>
+        <p class="warning">⚠️ API 키는 암호화되어 로컬에만 저장됩니다</p>
+
+        <div class="api-key-input">
+          <label>Gemini API Key:</label>
+          <input type="password" id="gemini-key" placeholder="AIza...">
+          <button class="btn btn-sm" onclick="testAPIKey('gemini')">테스트</button>
+          <button class="btn btn-sm btn-primary" onclick="saveAPIKey('gemini')">저장</button>
+        </div>
+
+        <div class="api-key-input">
+          <label>OpenAI API Key:</label>
+          <input type="password" id="openai-key" placeholder="sk-...">
+          <button class="btn btn-sm" onclick="testAPIKey('openai')">테스트</button>
+          <button class="btn btn-sm btn-primary" onclick="saveAPIKey('openai')">저장</button>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>기본 설정</h3>
+
+        <div class="setting-item">
+          <label>기본 모델:</label>
+          <select id="default-model">
+            <option value="gemini-2.5-flash-lite" selected>Gemini 2.5 Flash Lite</option>
+            <option value="gemini-3.0-flash">Gemini 3.0 Flash</option>
+            <option value="gpt-4o-mini">GPT-4o-mini</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <label>기본 스타일:</label>
+          <select id="default-style">
+            <option value="casual-work">캐주얼 업무용</option>
+            <option value="formal-work">격식있는 업무용</option>
+            <option value="very-casual">매우 캐주얼</option>
+            <option value="technical-doc">기술 문서용</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <label>
+            <input type="checkbox" id="auto-copy">
+            번역 후 자동으로 클립보드에 복사
+          </label>
+        </div>
+
+        <button class="btn btn-primary" onclick="saveSettings()">설정 저장</button>
+      </section>
+
+      <section class="settings-section">
+        <h3>데이터 관리</h3>
+        <div class="stats">
+          <p>저장된 번역: <strong id="total-count">0</strong>개</p>
+          <p>사용 용량: <strong id="storage-size">0</strong> KB</p>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="btn btn-secondary" onclick="exportToJSON()">📥 백업 다운로드</button>
+          <button class="btn btn-secondary" onclick="triggerImport()">📤 백업 가져오기</button>
+          <button class="btn btn-danger" onclick="clearAllData()">🗑️ 데이터 초기화</button>
+        </div>
+
+        <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(this.files[0])">
+      </section>
+
+      <section class="settings-section">
+        <h3>자동 카테고리 분류</h3>
+        <p style="margin-bottom: 16px;">미분류 항목: <strong id="uncategorized-count">0</strong>개</p>
+        <button class="btn btn-primary" onclick="categorizeUncategorized()">일괄 분류 실행</button>
+      </section>
+
+      <section class="settings-section">
+        <h3>통계</h3>
+        <div class="stats">
+          <p>총 번역: <strong id="stat-total">0</strong>개</p>
+          <p>이번 주: <strong id="stat-week">0</strong>개</p>
+          <p>평균/일: <strong id="stat-avg">0</strong>개</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- Modal Container -->
+    <div id="modal-container">
+      <!-- Similar Translations Modal -->
+      <div id="similar-modal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+          <h3>🔍 유사한 번역을 찾았습니다</h3>
+          <p>과거에 비슷한 문장을 번역한 적이 있습니다. 이 번역을 사용하시겠습니까?</p>
+
+          <div id="similar-list" class="similar-list"></div>
+
+          <div class="modal-actions">
+            <button id="use-similar-btn" class="btn btn-primary">✓ 이 번역 사용</button>
+            <button id="translate-new-btn" class="btn btn-secondary">⚡ 새로 번역</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+  </div>
+
+  <!-- External Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/dexie@3/dist/dexie.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <script>
+    // ========================================
+    // 1. Constants & Config
+    // ========================================
+
+    const STYLE_PROMPTS = {
+      'casual-work': `Translate the following Korean text to natural, casual but professional English appropriate for Slack communication in a US tech company.
+
+Requirements:
+- Natural phrasing that native speakers would use
+- Casual but respectful tone (like "Hey, could you check this?")
+- Tech industry terminology
+- Brevity while maintaining clarity
+
+IMPORTANT: Return ONLY the translated English text. Do not include multiple options, explanations, reasoning, or any other commentary. Just provide one single, natural translation.
+
+Korean: {INPUT}
+English:`,
+
+      'formal-work': `Translate the following Korean text to formal, professional English appropriate for business communication in a US tech company.
+
+Requirements:
+- Formal business language
+- Respectful and courteous tone (like "I would appreciate if you could review this.")
+- Professional terminology
+- Clear and precise communication
+
+IMPORTANT: Return ONLY the translated English text. Do not include multiple options, explanations, reasoning, or any other commentary. Just provide one single, natural translation.
+
+Korean: {INPUT}
+English:`,
+
+      'very-casual': `Translate the following Korean text to very casual, friendly English appropriate for informal Slack chats with colleagues.
+
+Requirements:
+- Conversational, friendly language
+- Informal expressions (like "Can you take a look at this real quick?")
+- Natural flow
+- Brevity
+
+IMPORTANT: Return ONLY the translated English text. Do not include multiple options, explanations, reasoning, or any other commentary. Just provide one single, natural translation.
+
+Korean: {INPUT}
+English:`,
+
+      'technical-doc': `Translate the following Korean text to technical, precise English appropriate for technical documentation.
+
+Requirements:
+- Technical accuracy
+- Precise terminology
+- Formal documentation style (like "This implementation utilizes...")
+- Clear technical descriptions
+
+IMPORTANT: Return ONLY the translated English text. Do not include multiple options, explanations, reasoning, or any other commentary. Just provide one single, natural translation.
+
+Korean: {INPUT}
+English:`
+    };
+
+    // Global state
+    let currentTranslationId = null;
+    let currentIsFavorite = false;
+    let currentPage = 0;
+    const PAGE_SIZE = 20;
+
+    // ========================================
+    // 2. Database Setup (Dexie)
+    // ========================================
+
+    const db = new Dexie('TranslationDB');
+    db.version(1).stores({
+      translations: 'id, timestamp, category, model, style, isFavorite, koreanText, englishText',
+      settings: 'key',
+      apiKeys: 'provider'
+    });
+
+    // ========================================
+    // 3. Utility Functions
+    // ========================================
+
+    function generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    function estimateTokens(text) {
+      return Math.ceil(text.length / 1.3);
+    }
+
+    function arrayBufferToBase64(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      bytes.forEach(b => binary += String.fromCharCode(b));
+      return btoa(binary);
+    }
+
+    function base64ToArrayBuffer(base64) {
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes.buffer;
+    }
+
+    // ========================================
+    // 4. UI Helper Functions
+    // ========================================
+
+    function showLoading() {
+      document.getElementById('loading-indicator').classList.remove('hidden');
+      document.getElementById('translate-btn').disabled = true;
+    }
+
+    function hideLoading() {
+      document.getElementById('loading-indicator').classList.add('hidden');
+      document.getElementById('translate-btn').disabled = false;
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.textContent = message;
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.add('fade-out');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // ========================================
+    // 5. Tab Navigation
+    // ========================================
+
+    function initTabs() {
+      const tabBtns = document.querySelectorAll('.tab-btn');
+      const tabContents = document.querySelectorAll('.tab-content');
+
+      tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const targetTab = btn.dataset.tab;
+
+          tabBtns.forEach(b => b.classList.remove('active'));
+          tabContents.forEach(c => c.classList.remove('active'));
+
+          btn.classList.add('active');
+          document.getElementById(`${targetTab}-tab`).classList.add('active');
+
+          // Update stats when opening settings tab
+          if (targetTab === 'settings') {
+            updateStats();
+          }
+
+          // Render history when opening history tab
+          if (targetTab === 'history') {
+            currentPage = 0;
+            renderHistory();
+          }
+        });
+      });
+    }
+
+    // ========================================
+    // 6. Encryption Functions (Web Crypto API)
+    // ========================================
+
+    async function encryptAPIKey(key, password = 'default-password-2024') {
+      const encoder = new TextEncoder();
+
+      const passwordKey = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(password),
+        'PBKDF2',
+        false,
+        ['deriveBits', 'deriveKey']
+      );
+
+      const cryptoKey = await crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt: encoder.encode('translator-salt-2024'),
+          iterations: 100000,
+          hash: 'SHA-256'
+        },
+        passwordKey,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      );
+
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const encrypted = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        cryptoKey,
+        encoder.encode(key)
+      );
+
+      return {
+        encrypted: arrayBufferToBase64(encrypted),
+        iv: arrayBufferToBase64(iv)
+      };
+    }
+
+    async function decryptAPIKey(encryptedData, password = 'default-password-2024') {
+      const decoder = new TextDecoder();
+      const encoder = new TextEncoder();
+
+      const passwordKey = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(password),
+        'PBKDF2',
+        false,
+        ['deriveBits', 'deriveKey']
+      );
+
+      const cryptoKey = await crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt: encoder.encode('translator-salt-2024'),
+          iterations: 100000,
+          hash: 'SHA-256'
+        },
+        passwordKey,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      );
+
+      const decrypted = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: base64ToArrayBuffer(encryptedData.iv) },
+        cryptoKey,
+        base64ToArrayBuffer(encryptedData.encrypted)
+      );
+
+      return decoder.decode(decrypted);
+    }
+
+    async function getDecryptedAPIKey(provider) {
+      const apiKeyData = await db.apiKeys.get(provider);
+
+      if (!apiKeyData) {
+        throw new Error(`${provider} API 키가 설정되지 않았습니다. 설정 탭에서 API 키를 입력해주세요.`);
+      }
+
+      return await decryptAPIKey({
+        encrypted: apiKeyData.encrypted,
+        iv: apiKeyData.iv
+      });
+    }
+
+    // ========================================
+    // 7. API Service Layer
+    // ========================================
+
+    const APIService = {
+      async callGemini(prompt, modelVariant = 'gemini-2.5-flash-lite') {
+        const apiKey = await getDecryptedAPIKey('gemini');
+
+        // Determine model name and config based on variant
+        let modelName;
+        let generationConfig = {};
+
+        if (modelVariant === 'gemini-2.5-flash-lite') {
+          modelName = 'gemini-2.5-flash-lite';
+          // Lite model is fast and optimized, no extra config needed
+        } else if (modelVariant === 'gemini-3.0-flash') {
+          modelName = 'gemini-3-flash-preview';
+          generationConfig = {
+            temperature: 0.7,
+            topP: 0.95,
+            topK: 40
+          };
+        }
+
+        const requestBody = {
+          contents: [{ parts: [{ text: prompt }] }]
+        };
+
+        // Add generation config if specified
+        if (Object.keys(generationConfig).length > 0) {
+          requestBody.generationConfig = generationConfig;
+        }
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey
+            },
+            body: JSON.stringify(requestBody)
+          }
+        );
+
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            throw new Error('API 키가 유효하지 않습니다');
+          } else if (response.status === 429) {
+            throw new Error('API 호출 한도를 초과했습니다');
+          } else {
+            throw new Error(`API 오류 (${response.status})`);
+          }
+        }
+
+        const data = await response.json();
+        return data.candidates[0].content.parts[0].text;
+      },
+
+      async callGPT(prompt) {
+        const apiKey = await getDecryptedAPIKey('openai');
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            max_tokens: 1024,
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('API 키가 유효하지 않습니다');
+          } else if (response.status === 429) {
+            throw new Error('API 호출 한도를 초과했습니다');
+          } else {
+            throw new Error(`API 오류 (${response.status})`);
+          }
+        }
+
+        const data = await response.json();
+        return data.choices[0].message.content;
+      },
+
+      async getEmbedding(text) {
+        const apiKey = await getDecryptedAPIKey('openai');
+
+        const response = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: 'text-embedding-3-small',
+            input: text
+          })
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('OpenAI API 키가 유효하지 않습니다');
+          } else if (response.status === 429) {
+            throw new Error('API 호출 한도를 초과했습니다');
+          } else {
+            throw new Error(`Embedding API 오류 (${response.status})`);
+          }
+        }
+
+        const data = await response.json();
+        return data.data[0].embedding;
+      }
+    };
+
+    // ========================================
+    // 8. Database CRUD Functions
+    // ========================================
+
+    async function saveTranslation(data) {
+      const translation = {
+        id: generateUUID(),
+        koreanText: data.koreanText,
+        englishText: data.englishText,
+        model: data.model,
+        style: data.style,
+        category: data.category || null,
+        embedding: data.embedding || null,
+        isFavorite: false,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          charCount: data.koreanText.length,
+          tokenCount: estimateTokens(data.koreanText),
+          confidence: 1.0
+        }
+      };
+
+      await db.translations.add(translation);
+      return translation.id;
+    }
+
+    async function updateTranslation(id, updates) {
+      return await db.translations.update(id, updates);
+    }
+
+    async function deleteTranslation(id) {
+      return await db.translations.delete(id);
+    }
+
+    // ========================================
+    // 9. Settings Functions
+    // ========================================
+
+    async function saveAPIKey(provider) {
+      const inputId = `${provider}-key`;
+      const key = document.getElementById(inputId).value.trim();
+
+      if (!key) {
+        showToast('API 키를 입력해주세요', 'warning');
+        return;
+      }
+
+      try {
+        const encrypted = await encryptAPIKey(key);
+
+        await db.apiKeys.put({
+          provider,
+          encrypted: encrypted.encrypted,
+          iv: encrypted.iv
+        });
+
+        showToast(`${provider} API 키가 저장되었습니다`, 'success');
+
+      } catch (error) {
+        showToast(`저장 실패: ${error.message}`, 'error');
+      }
+    }
+
+    async function testAPIKey(provider) {
+      try {
+        showToast('API 키 테스트 중...', 'info');
+
+        if (provider === 'gemini') {
+          await APIService.callGemini('Hi', 'gemini-2.5-flash-lite');
+        } else if (provider === 'openai') {
+          await APIService.getEmbedding('test');
+        }
+
+        showToast(`✅ ${provider} API 키가 유효합니다`, 'success');
+
+      } catch (error) {
+        showToast(`❌ ${provider} API 키 테스트 실패: ${error.message}`, 'error');
+      }
+    }
+
+    async function saveSettings() {
+      const settings = {
+        defaultModel: document.getElementById('default-model').value,
+        defaultStyle: document.getElementById('default-style').value,
+        autoCopy: document.getElementById('auto-copy').checked
+      };
+
+      await db.settings.put({ key: 'userSettings', value: settings });
+
+      showToast('설정이 저장되었습니다', 'success');
+    }
+
+    async function loadSettings() {
+      const saved = await db.settings.get('userSettings');
+
+      if (saved) {
+        document.getElementById('default-model').value = saved.value.defaultModel;
+        document.getElementById('default-style').value = saved.value.defaultStyle;
+        document.getElementById('auto-copy').checked = saved.value.autoCopy;
+
+        // Apply to translation tab
+        document.getElementById('model-select').value = saved.value.defaultModel;
+        document.getElementById('style-select').value = saved.value.defaultStyle;
+      }
+    }
+
+    async function updateStats() {
+      const all = await db.translations.toArray();
+
+      document.getElementById('total-count').textContent = all.length;
+
+      const uncategorized = all.filter(t => !t.category).length;
+      document.getElementById('uncategorized-count').textContent = uncategorized;
+
+      const size = JSON.stringify(all).length / 1024;
+      document.getElementById('storage-size').textContent = size.toFixed(2);
+
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const thisWeek = all.filter(t => new Date(t.timestamp) > oneWeekAgo).length;
+      document.getElementById('stat-week').textContent = thisWeek;
+
+      if (all.length > 0) {
+        const oldestDate = new Date(all[all.length - 1].timestamp);
+        const daysSince = Math.max(1, (Date.now() - oldestDate) / (1000 * 60 * 60 * 24));
+        const avgPerDay = (all.length / daysSince).toFixed(1);
+        document.getElementById('stat-avg').textContent = avgPerDay;
+      } else {
+        document.getElementById('stat-avg').textContent = '0';
+      }
+
+      document.getElementById('stat-total').textContent = all.length;
+    }
+
+    // ========================================
+    // 10. Smart Features (Phase 3)
+    // ========================================
+
+    // Cosine similarity calculation
+    function cosineSimilarity(vecA, vecB) {
+      if (!vecA || !vecB || vecA.length !== vecB.length) {
+        return 0;
+      }
+
+      const dotProduct = vecA.reduce((sum, a, i) => sum + a * vecB[i], 0);
+      const magA = Math.sqrt(vecA.reduce((sum, a) => sum + a * a, 0));
+      const magB = Math.sqrt(vecB.reduce((sum, b) => sum + b * b, 0));
+
+      if (magA === 0 || magB === 0) return 0;
+
+      return dotProduct / (magA * magB);
+    }
+
+    // Find similar translations using embedding-based search
+    async function findSimilarTranslations(text) {
+      try {
+        // Get embedding for input text
+        const queryEmbedding = await APIService.getEmbedding(text);
+
+        // Load all translations with embeddings
+        const allTranslations = await db.translations.toArray();
+
+        // Calculate similarity for each translation
+        const withSimilarity = allTranslations
+          .filter(t => t.embedding && Array.isArray(t.embedding) && t.embedding.length === 1536)
+          .map(t => ({
+            ...t,
+            similarity: cosineSimilarity(queryEmbedding, t.embedding)
+          }));
+
+        // Filter by threshold (0.85) and sort by similarity
+        return withSimilarity
+          .filter(t => t.similarity > 0.85)
+          .sort((a, b) => b.similarity - a.similarity)
+          .slice(0, 3); // Return top 3 matches
+      } catch (error) {
+        console.error('유사 번역 검색 실패:', error);
+        return []; // Return empty array on error
+      }
+    }
+
+    // Show similar translations modal
+    async function showSimilarModal(similarTranslations) {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('similar-modal');
+        const listContainer = document.getElementById('similar-list');
+
+        // Render similar translations
+        listContainer.innerHTML = similarTranslations.map((t, i) => `
+          <div class="similar-item ${i === 0 ? 'selected' : ''}" data-index="${i}">
+            <div class="similarity-badge">${Math.round(t.similarity * 100)}% 유사</div>
+            <div class="similarity-content">
+              <div class="korean-text">${t.koreanText}</div>
+              <div class="english-text">${t.englishText}</div>
+              <div class="meta-info">
+                <span class="model-badge">${t.model}</span>
+                <span class="style-badge">${t.style}</span>
+                <span class="timestamp">${new Date(t.timestamp).toLocaleDateString('ko-KR')}</span>
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+        // Show modal
+        modal.classList.remove('hidden');
+
+        let selectedIndex = 0;
+
+        // Click event for selecting similar translation
+        listContainer.querySelectorAll('.similar-item').forEach((item, i) => {
+          item.addEventListener('click', () => {
+            listContainer.querySelectorAll('.similar-item').forEach(it =>
+              it.classList.remove('selected'));
+            item.classList.add('selected');
+            selectedIndex = i;
+          });
+        });
+
+        // Use similar translation button
+        const useSimilarBtn = document.getElementById('use-similar-btn');
+        useSimilarBtn.onclick = () => {
+          modal.classList.add('hidden');
+          resolve(similarTranslations[selectedIndex]);
+        };
+
+        // Translate new button
+        const translateNewBtn = document.getElementById('translate-new-btn');
+        translateNewBtn.onclick = () => {
+          modal.classList.add('hidden');
+          resolve('new');
+        };
+      });
+    }
+
+    // ========================================
+    // 11. Translation Functions (Phase 2 + Phase 3)
+    // ========================================
+
+    async function executeTranslation() {
+      const koreanText = document.getElementById('korean-input').value.trim();
+
+      if (!koreanText) {
+        showToast('번역할 텍스트를 입력해주세요', 'warning');
+        return;
+      }
+
+      const model = document.getElementById('model-select').value;
+      const style = document.getElementById('style-select').value;
+
+      try {
+        showLoading();
+
+        // Phase 3: Check for similar translations
+        const similarTranslations = await findSimilarTranslations(koreanText);
+
+        if (similarTranslations.length > 0) {
+          hideLoading();
+          const userChoice = await showSimilarModal(similarTranslations);
+
+          if (userChoice !== 'new') {
+            // User selected existing translation
+            displayTranslationResult(userChoice.englishText);
+            currentTranslationId = userChoice.id;
+            currentIsFavorite = userChoice.isFavorite || false;
+
+            const favoriteBtn = document.getElementById('favorite-btn');
+            favoriteBtn.textContent = currentIsFavorite ? '⭐ 즐겨찾기됨' : '⭐ 즐겨찾기';
+
+            showToast('기존 번역을 사용합니다', 'success');
+
+            // Auto-copy if enabled
+            const settings = await db.settings.get('userSettings');
+            if (settings && settings.value.autoCopy) {
+              await copyToClipboard(userChoice.englishText);
+            }
+
+            return;
+          }
+
+          // User wants new translation
+          showLoading();
+        }
+
+        // Build prompt
+        const prompt = STYLE_PROMPTS[style].replace('{INPUT}', koreanText);
+
+        // Call AI API based on selected model
+        let englishText;
+        if (model === 'gemini-2.5-flash-lite' || model === 'gemini-3.0-flash') {
+          englishText = await APIService.callGemini(prompt, model);
+        } else if (model === 'gpt-4o-mini') {
+          englishText = await APIService.callGPT(prompt);
+        }
+
+        // Clean up the result
+        englishText = englishText.trim();
+
+        // Display result
+        displayTranslationResult(englishText);
+
+        // Phase 3: Generate embedding for Korean text
+        let embedding = null;
+        try {
+          embedding = await APIService.getEmbedding(koreanText);
+        } catch (embeddingError) {
+          console.warn('임베딩 생성 실패 (번역은 저장됨):', embeddingError);
+        }
+
+        // Save to IndexedDB with embedding
+        currentTranslationId = await saveTranslation({
+          koreanText,
+          englishText,
+          model,
+          style,
+          category: null,
+          embedding
+        });
+
+        hideLoading();
+        showToast('번역이 완료되었습니다', 'success');
+
+        // Auto-copy if enabled
+        const settings = await db.settings.get('userSettings');
+        if (settings && settings.value.autoCopy) {
+          await copyToClipboard(englishText);
+        }
+
+      } catch (error) {
+        hideLoading();
+        console.error('번역 실패:', error);
+        showToast(`번역 실패: ${error.message}`, 'error');
+      }
+    }
+
+    function displayTranslationResult(englishText) {
+      const outputBox = document.getElementById('english-output');
+      outputBox.textContent = englishText;
+      document.getElementById('result-section').classList.remove('hidden');
+
+      // Reset favorite button state
+      currentIsFavorite = false;
+      const favoriteBtn = document.getElementById('favorite-btn');
+      favoriteBtn.textContent = '⭐ 즐겨찾기';
+    }
+
+    async function copyToClipboard(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast('복사됨!', 'success');
+      } catch (error) {
+        console.error('복사 실패:', error);
+        showToast('복사 실패', 'error');
+      }
+    }
+
+    async function toggleFavorite() {
+      if (!currentTranslationId) {
+        showToast('저장된 번역이 없습니다', 'warning');
+        return;
+      }
+
+      currentIsFavorite = !currentIsFavorite;
+
+      await updateTranslation(currentTranslationId, {
+        isFavorite: currentIsFavorite
+      });
+
+      const btn = document.getElementById('favorite-btn');
+      btn.textContent = currentIsFavorite ? '⭐ 즐겨찾기됨' : '⭐ 즐겨찾기';
+
+      showToast(
+        currentIsFavorite ? '즐겨찾기에 추가됨' : '즐겨찾기에서 제거됨',
+        'success'
+      );
+    }
+
+    async function deleteCurrentTranslation() {
+      if (!currentTranslationId) {
+        showToast('삭제할 번역이 없습니다', 'warning');
+        return;
+      }
+
+      const confirmed = confirm('이 번역을 삭제하시겠습니까?');
+      if (!confirmed) return;
+
+      try {
+        await deleteTranslation(currentTranslationId);
+
+        // Clear UI
+        document.getElementById('korean-input').value = '';
+        document.getElementById('english-output').textContent = '';
+        document.getElementById('result-section').classList.add('hidden');
+
+        currentTranslationId = null;
+        currentIsFavorite = false;
+
+        showToast('번역이 삭제되었습니다', 'success');
+        await updateStats();
+
+      } catch (error) {
+        console.error('삭제 실패:', error);
+        showToast('삭제 실패', 'error');
+      }
+    }
+
+    // ========================================
+    // 11. Event Listeners for Translation Functions
+    // ========================================
+
+    function setupTranslationEventListeners() {
+      // Translate button
+      const translateBtn = document.getElementById('translate-btn');
+      if (translateBtn) {
+        translateBtn.addEventListener('click', executeTranslation);
+      }
+
+      // Copy button
+      const copyBtn = document.getElementById('copy-btn');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+          const outputText = document.getElementById('english-output').textContent;
+          if (outputText && outputText !== '번역 결과가 여기에 표시됩니다') {
+            copyToClipboard(outputText);
+          } else {
+            showToast('복사할 번역 결과가 없습니다', 'warning');
+          }
+        });
+      }
+
+      // Favorite button
+      const favoriteBtn = document.getElementById('favorite-btn');
+      if (favoriteBtn) {
+        favoriteBtn.addEventListener('click', toggleFavorite);
+      }
+
+      // Delete button
+      const deleteBtn = document.getElementById('delete-btn');
+      if (deleteBtn) {
+        deleteBtn.addEventListener('click', deleteCurrentTranslation);
+      }
+
+      // Keyboard shortcuts
+      const koreanInput = document.getElementById('korean-input');
+      if (koreanInput) {
+        koreanInput.addEventListener('keydown', (e) => {
+          // Enter key: Execute translation
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            executeTranslation();
+          }
+          // Shift+Enter: Allow newline (default behavior)
+          // Cmd/Ctrl + Shift + C: Copy to clipboard
+          if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'c') {
+            e.preventDefault();
+            const outputText = document.getElementById('english-output').textContent;
+            if (outputText && outputText !== '번역 결과가 여기에 표시됩니다') {
+              copyToClipboard(outputText);
+            }
+          }
+        });
+      }
+    }
+
+    // ========================================
+    // 12. History & Search Functions (Phase 4)
+    // ========================================
+
+    let searchTimeout;
+    let allFilteredTranslations = []; // Cache for current filter/search results
+
+    async function renderHistory(append = false) {
+      const searchQuery = document.getElementById('search-input').value.toLowerCase().trim();
+      const categoryFilter = document.getElementById('filter-category').value;
+      const modelFilter = document.getElementById('filter-model').value;
+      const favoriteFilter = document.getElementById('filter-favorite')?.checked || false;
+      const sortBy = document.getElementById('sort-by').value;
+
+      try {
+        // Load all translations
+        let translations = await db.translations.toArray();
+
+        // Apply search filter
+        if (searchQuery) {
+          translations = translations.filter(t =>
+            t.koreanText.toLowerCase().includes(searchQuery) ||
+            t.englishText.toLowerCase().includes(searchQuery)
+          );
+        }
+
+        // Apply category filter
+        if (categoryFilter) {
+          translations = translations.filter(t => t.category === categoryFilter);
+        }
+
+        // Apply model filter
+        if (modelFilter) {
+          translations = translations.filter(t => t.model === modelFilter);
+        }
+
+        // Apply favorite filter
+        if (favoriteFilter) {
+          translations = translations.filter(t => t.isFavorite === true);
+        }
+
+        // Apply sorting
+        if (sortBy === 'newest') {
+          translations.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        } else if (sortBy === 'oldest') {
+          translations.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        } else if (sortBy === 'alphabetical') {
+          translations.sort((a, b) => a.koreanText.localeCompare(b.koreanText, 'ko'));
+        }
+
+        // Store filtered results for pagination
+        allFilteredTranslations = translations;
+
+        // Pagination
+        const start = currentPage * PAGE_SIZE;
+        const end = start + PAGE_SIZE;
+        const pageTranslations = translations.slice(start, end);
+
+        // Render
+        const container = document.getElementById('history-list');
+
+        if (!append) {
+          container.innerHTML = '';
+        }
+
+        if (translations.length === 0) {
+          container.innerHTML = '<div class="empty-state">번역 기록이 없습니다</div>';
+          document.getElementById('load-more-btn').style.display = 'none';
+          return;
+        }
+
+        if (pageTranslations.length === 0 && currentPage > 0) {
+          container.innerHTML = '<div class="empty-state">더 이상 결과가 없습니다</div>';
+          document.getElementById('load-more-btn').style.display = 'none';
+          return;
+        }
+
+        pageTranslations.forEach(t => {
+          const card = createHistoryCard(t);
+          container.appendChild(card);
+        });
+
+        // Show/hide "Load more" button
+        const loadMoreBtn = document.getElementById('load-more-btn');
+        if (end < translations.length) {
+          loadMoreBtn.style.display = 'block';
+        } else {
+          loadMoreBtn.style.display = 'none';
+        }
+
+      } catch (error) {
+        console.error('히스토리 렌더링 실패:', error);
+        const container = document.getElementById('history-list');
+        container.innerHTML = '<div class="empty-state">히스토리를 불러오는데 실패했습니다</div>';
+      }
+    }
+
+    function createHistoryCard(translation) {
+      const card = document.createElement('div');
+      card.className = 'history-card';
+      card.dataset.id = translation.id;
+
+      const timestamp = formatDate(translation.timestamp);
+      const categoryBadge = translation.category
+        ? `<span class="badge category">${translation.category}</span>`
+        : '';
+      const modelBadge = `<span class="badge">${translation.model}</span>`;
+      const styleBadge = `<span class="badge">${translation.style}</span>`;
+
+      card.innerHTML = `
+        <div class="card-header">
+          <span class="timestamp">${timestamp}</span>
+          <span class="badges">
+            ${categoryBadge}
+            ${modelBadge}
+            ${styleBadge}
+          </span>
+        </div>
+        <div class="card-body">
+          <div class="korean-text">${escapeHtml(translation.koreanText)}</div>
+          <div class="english-text">${escapeHtml(translation.englishText)}</div>
+        </div>
+        <div class="card-actions">
+          <button class="btn-icon copy-card-btn" title="복사">📋</button>
+          <button class="btn-icon favorite-card-btn ${translation.isFavorite ? 'active' : ''}" title="즐겨찾기">⭐</button>
+          <button class="btn-icon delete-card-btn" title="삭제">🗑️</button>
+        </div>
+      `;
+
+      // Add event listeners
+      const copyBtn = card.querySelector('.copy-card-btn');
+      copyBtn.addEventListener('click', () => {
+        copyToClipboard(translation.englishText);
+      });
+
+      const favoriteBtn = card.querySelector('.favorite-card-btn');
+      favoriteBtn.addEventListener('click', async () => {
+        await toggleCardFavorite(translation.id, favoriteBtn);
+      });
+
+      const deleteBtn = card.querySelector('.delete-card-btn');
+      deleteBtn.addEventListener('click', async () => {
+        await deleteCardTranslation(translation.id, card);
+      });
+
+      return card;
+    }
+
+    function formatDate(timestamp) {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 0) {
+        return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+      } else if (diffDays === 1) {
+        return '어제';
+      } else if (diffDays < 7) {
+        return `${diffDays}일 전`;
+      } else {
+        return date.toLocaleDateString('ko-KR', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    async function toggleCardFavorite(translationId, buttonElement) {
+      try {
+        const translation = await db.translations.get(translationId);
+        if (!translation) return;
+
+        const newFavoriteState = !translation.isFavorite;
+
+        await updateTranslation(translationId, {
+          isFavorite: newFavoriteState
+        });
+
+        if (newFavoriteState) {
+          buttonElement.classList.add('active');
+        } else {
+          buttonElement.classList.remove('active');
+        }
+
+        showToast(
+          newFavoriteState ? '즐겨찾기에 추가됨' : '즐겨찾기에서 제거됨',
+          'success'
+        );
+
+        // Update stats
+        await updateStats();
+
+      } catch (error) {
+        console.error('즐겨찾기 토글 실패:', error);
+        showToast('즐겨찾기 업데이트 실패', 'error');
+      }
+    }
+
+    async function deleteCardTranslation(translationId, cardElement) {
+      const confirmed = confirm('이 번역을 삭제하시겠습니까?');
+      if (!confirmed) return;
+
+      try {
+        await deleteTranslation(translationId);
+
+        // Remove card with animation
+        cardElement.style.opacity = '0';
+        cardElement.style.transform = 'translateX(-20px)';
+        setTimeout(() => {
+          cardElement.remove();
+
+          // Check if list is empty
+          const container = document.getElementById('history-list');
+          if (container.children.length === 0) {
+            currentPage = 0;
+            renderHistory();
+          }
+        }, 300);
+
+        showToast('번역이 삭제되었습니다', 'success');
+        await updateStats();
+
+      } catch (error) {
+        console.error('삭제 실패:', error);
+        showToast('삭제 실패', 'error');
+      }
+    }
+
+    // Setup history event listeners
+    function setupHistoryEventListeners() {
+      // Search with debouncing
+      const searchInput = document.getElementById('search-input');
+      if (searchInput) {
+        searchInput.addEventListener('input', () => {
+          clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(() => {
+            currentPage = 0;
+            renderHistory();
+          }, 300);
+        });
+      }
+
+      // Filter listeners
+      const filterCategory = document.getElementById('filter-category');
+      if (filterCategory) {
+        filterCategory.addEventListener('change', () => {
+          currentPage = 0;
+          renderHistory();
+        });
+      }
+
+      const filterModel = document.getElementById('filter-model');
+      if (filterModel) {
+        filterModel.addEventListener('change', () => {
+          currentPage = 0;
+          renderHistory();
+        });
+      }
+
+      // Sort listener
+      const sortBy = document.getElementById('sort-by');
+      if (sortBy) {
+        sortBy.addEventListener('change', () => {
+          currentPage = 0;
+          renderHistory();
+        });
+      }
+
+      // Load more button
+      const loadMoreBtn = document.getElementById('load-more-btn');
+      if (loadMoreBtn) {
+        loadMoreBtn.addEventListener('click', () => {
+          currentPage++;
+          renderHistory(true);
+        });
+      }
+
+      // Export button with dropdown
+      const exportBtn = document.getElementById('export-btn');
+      if (exportBtn) {
+        exportBtn.addEventListener('click', showExportMenu);
+      }
+    }
+
+    // Show export dropdown menu
+    function showExportMenu() {
+      // Remove any existing menu
+      const existingMenu = document.querySelector('.export-menu');
+      if (existingMenu) {
+        existingMenu.remove();
+        return;
+      }
+
+      const menu = document.createElement('div');
+      menu.className = 'export-menu';
+      menu.innerHTML = `
+        <button onclick="exportToJSON(); document.querySelector('.export-menu')?.remove();">📄 JSON으로 내보내기</button>
+        <button onclick="exportToCSV(); document.querySelector('.export-menu')?.remove();">📊 CSV로 내보내기</button>
+        <button onclick="exportToPDF(); document.querySelector('.export-menu')?.remove();">📕 PDF로 내보내기</button>
+      `;
+
+      const exportBtn = document.getElementById('export-btn');
+      const rect = exportBtn.getBoundingClientRect();
+
+      menu.style.top = `${rect.bottom + 5}px`;
+      menu.style.left = `${rect.left}px`;
+
+      document.body.appendChild(menu);
+
+      // Close menu when clicking outside
+      const closeMenu = (e) => {
+        if (!menu.contains(e.target) && e.target !== exportBtn) {
+          menu.remove();
+          document.removeEventListener('click', closeMenu);
+        }
+      };
+
+      setTimeout(() => {
+        document.addEventListener('click', closeMenu);
+      }, 100);
+    }
+
+    // ========================================
+    // 13. Data Management Functions (Phase 5)
+    // ========================================
+
+    // JSON Export
+    async function exportToJSON() {
+      try {
+        const translations = await db.translations.toArray();
+
+        if (translations.length === 0) {
+          showToast('내보낼 번역이 없습니다', 'warning');
+          return;
+        }
+
+        const data = {
+          version: '1.0',
+          exportDate: new Date().toISOString(),
+          count: translations.length,
+          translations: translations.map(t => ({
+            ...t,
+            embedding: undefined // Reduce file size
+          }))
+        };
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], {
+          type: 'application/json'
+        });
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `translations_backup_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        showToast(`${translations.length}개 번역을 내보냈습니다`, 'success');
+
+      } catch (error) {
+        console.error('JSON Export 실패:', error);
+        showToast('내보내기 실패', 'error');
+      }
+    }
+
+    // CSV Export
+    async function exportToCSV() {
+      try {
+        const translations = await db.translations.toArray();
+
+        if (translations.length === 0) {
+          showToast('내보낼 번역이 없습니다', 'warning');
+          return;
+        }
+
+        const headers = ['Timestamp', 'Korean', 'English', 'Category', 'Model', 'Style', 'Favorite'];
+
+        const rows = translations.map(t => [
+          t.timestamp,
+          `"${t.koreanText.replace(/"/g, '""')}"`,
+          `"${t.englishText.replace(/"/g, '""')}"`,
+          t.category || '',
+          t.model,
+          t.style,
+          t.isFavorite ? 'Yes' : 'No'
+        ]);
+
+        const csv = [headers, ...rows]
+          .map(row => row.join(','))
+          .join('\n');
+
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `translations_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        showToast(`${translations.length}개 번역을 CSV로 내보냈습니다`, 'success');
+
+      } catch (error) {
+        console.error('CSV Export 실패:', error);
+        showToast('CSV 내보내기 실패', 'error');
+      }
+    }
+
+    // PDF Export
+    async function exportToPDF() {
+      try {
+        const translations = await db.translations
+          .orderBy('category')
+          .toArray();
+
+        if (translations.length === 0) {
+          showToast('내보낼 번역이 없습니다', 'warning');
+          return;
+        }
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        let y = 20;
+
+        // Title
+        doc.setFontSize(16);
+        doc.text('Korean-English Translations', 10, y);
+        y += 5;
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`Generated on ${new Date().toLocaleDateString('ko-KR')}`, 10, y);
+        doc.setTextColor(0);
+        y += 10;
+
+        let currentCategory = null;
+
+        translations.forEach((t, i) => {
+          // Check if need new page
+          if (y > 260) {
+            doc.addPage();
+            y = 20;
+          }
+
+          // Category header
+          if (t.category !== currentCategory) {
+            currentCategory = t.category;
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text(t.category || 'Uncategorized', 10, y);
+            y += 8;
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(9);
+          }
+
+          // Translation entry
+          const koreanLines = doc.splitTextToSize(`${i + 1}. ${t.koreanText}`, 180);
+          doc.text(koreanLines, 10, y);
+          y += koreanLines.length * 5;
+
+          doc.setTextColor(80);
+          const englishLines = doc.splitTextToSize(`   -> ${t.englishText}`, 180);
+          doc.text(englishLines, 10, y);
+          doc.setTextColor(0);
+          y += englishLines.length * 5 + 3;
+        });
+
+        doc.save(`translations_${new Date().toISOString().split('T')[0]}.pdf`);
+        showToast(`${translations.length}개 번역을 PDF로 내보냈습니다`, 'success');
+
+      } catch (error) {
+        console.error('PDF Export 실패:', error);
+        showToast('PDF 내보내기 실패', 'error');
+      }
+    }
+
+    // JSON Import
+    function triggerImport() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = handleImport;
+      input.click();
+    }
+
+    async function handleImport(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+
+        if (data.version !== '1.0') {
+          showToast('지원하지 않는 백업 버전입니다', 'error');
+          return;
+        }
+
+        const confirmed = confirm(
+          `${data.count}개의 번역을 가져오시겠습니까?\n기존 데이터에 추가됩니다.`
+        );
+
+        if (!confirmed) return;
+
+        showLoading();
+
+        let importedCount = 0;
+        for (const t of data.translations) {
+          await db.translations.add({
+            ...t,
+            id: generateUUID(), // New ID to avoid conflicts
+            embedding: null // Embeddings need to be regenerated
+          });
+          importedCount++;
+        }
+
+        hideLoading();
+        showToast(`${importedCount}개의 번역을 가져왔습니다`, 'success');
+        await updateStats();
+
+        // Refresh history if on history tab
+        const activeTab = document.querySelector('.tab-content.active');
+        if (activeTab && activeTab.id === 'history-tab') {
+          currentPage = 0;
+          renderHistory();
+        }
+
+      } catch (error) {
+        hideLoading();
+        console.error('Import 실패:', error);
+        showToast('가져오기 실패: 파일 형식을 확인해주세요', 'error');
+      }
+    }
+
+    // Auto-categorize uncategorized translations
+    async function categorizeUncategorized() {
+      try {
+        const uncategorized = await db.translations
+          .filter(t => !t.category)
+          .toArray();
+
+        if (uncategorized.length === 0) {
+          showToast('분류할 항목이 없습니다', 'info');
+          return;
+        }
+
+        const confirmed = confirm(
+          `${uncategorized.length}개의 미분류 항목을 자동 분류하시겠습니까?\n(Gemini API 사용)`
+        );
+
+        if (!confirmed) return;
+
+        showLoading();
+
+        // Build categorization prompt
+        const prompt = `Categorize these Slack messages into one of these categories: Code Review, Bug Report, Feature Discussion, Meeting Schedule, Question, Update/Status, Casual Chat, Other.
+
+IMPORTANT: Return ONLY a valid JSON array. Do not include any explanations or markdown code blocks.
+
+Format:
+[{"id": "uuid-here", "category": "Category Name"}, ...]
+
+Messages:
+${uncategorized.slice(0, 50).map((t, i) => // Limit to 50 for API constraints
+  `${i + 1}. [id: ${t.id}] Korean: "${t.koreanText}" English: "${t.englishText}"`
+).join('\n')}`;
+
+        const result = await APIService.callGemini(prompt, 'gemini-2.5-flash-lite');
+
+        // Extract JSON from response (in case model returns with markdown)
+        let jsonText = result.trim();
+        if (jsonText.startsWith('```json')) {
+          jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+        } else if (jsonText.startsWith('```')) {
+          jsonText = jsonText.replace(/```\n?/g, '');
+        }
+
+        const categories = JSON.parse(jsonText);
+
+        // Update database
+        let updatedCount = 0;
+        for (const item of categories) {
+          if (item.id && item.category) {
+            await updateTranslation(item.id, { category: item.category });
+            updatedCount++;
+          }
+        }
+
+        hideLoading();
+        showToast(`${updatedCount}개 항목을 분류했습니다`, 'success');
+
+        // Refresh history if on history tab
+        const activeTab = document.querySelector('.tab-content.active');
+        if (activeTab && activeTab.id === 'history-tab') {
+          currentPage = 0;
+          renderHistory();
+        }
+
+      } catch (error) {
+        hideLoading();
+        console.error('자동 분류 실패:', error);
+        showToast(`분류 실패: ${error.message}`, 'error');
+      }
+    }
+
+    // Clear all data
+    async function clearAllData() {
+      const confirmed = confirm(
+        '정말로 모든 번역 데이터를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.'
+      );
+
+      if (!confirmed) return;
+
+      // Double confirmation
+      const doubleConfirm = confirm('한 번 더 확인합니다. 정말 삭제하시겠습니까?');
+
+      if (!doubleConfirm) return;
+
+      try {
+        await db.translations.clear();
+
+        showToast('모든 번역 데이터가 삭제되었습니다', 'success');
+        await updateStats();
+
+        // Refresh history if on history tab
+        const activeTab = document.querySelector('.tab-content.active');
+        if (activeTab && activeTab.id === 'history-tab') {
+          currentPage = 0;
+          renderHistory();
+        }
+
+      } catch (error) {
+        console.error('데이터 삭제 실패:', error);
+        showToast('데이터 삭제 실패', 'error');
+      }
+    }
+
+    // ========================================
+    // 11. Initialization
+    // ========================================
+
+    async function init() {
+      try {
+        await db.open();
+        console.log('Database initialized');
+
+        initTabs();
+        setupTranslationEventListeners();
+        setupHistoryEventListeners();
+        await loadSettings();
+        await updateStats();
+
+        console.log('App initialized successfully');
+        showToast('앱이 준비되었습니다', 'success');
+
+      } catch (error) {
+        console.error('Initialization failed:', error);
+        showToast('앱 초기화 중 오류가 발생했습니다', 'error');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    // ========================================
+    // 12. Global Error Handling
+    // ========================================
+
+    window.addEventListener('error', (event) => {
+      console.error('전역 에러:', event.error);
+      showToast('예상치 못한 오류가 발생했습니다', 'error');
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error('Promise rejection:', event.reason);
+      showToast('비동기 작업 중 오류가 발생했습니다', 'error');
+    });
+
+    // ========================================
+    // 13. Embedded Test Framework (활성화: ?test URL 파라미터)
+    // ========================================
+
+    const isTestMode = window.location.search.includes('test');
+
+    if (isTestMode) {
+      console.log('🧪 Test Mode Activated');
+
+      // Test Framework
+      const TestRunner = {
+        tests: [],
+        results: [],
+        passCount: 0,
+        failCount: 0,
+
+        test(name, fn) {
+          this.tests.push({ name, fn });
+        },
+
+        async runAll() {
+          console.log('🚀 Running tests...\\n');
+          this.results = [];
+          this.passCount = 0;
+          this.failCount = 0;
+
+          for (const test of this.tests) {
+            try {
+              await test.fn();
+              this.results.push({ name: test.name, status: 'pass' });
+              this.passCount++;
+              console.log(`✅ PASS: ${test.name}`);
+            } catch (error) {
+              this.results.push({ name: test.name, status: 'fail', error: error.message });
+              this.failCount++;
+              console.error(`❌ FAIL: ${test.name}\\n   Error: ${error.message}`);
+            }
+          }
+
+          this.displayResults();
+        },
+
+        displayResults() {
+          console.log('\\n' + '='.repeat(60));
+          console.log('📊 Test Results');
+          console.log('='.repeat(60));
+          console.log(`Total: ${this.tests.length} | Pass: ${this.passCount} | Fail: ${this.failCount}`);
+          console.log(`Success Rate: ${((this.passCount / this.tests.length) * 100).toFixed(1)}%`);
+          console.log('='.repeat(60));
+
+          // Create test results UI
+          this.createTestUI();
+        },
+
+        createTestUI() {
+          const existingUI = document.getElementById('test-results-ui');
+          if (existingUI) existingUI.remove();
+
+          const ui = document.createElement('div');
+          ui.id = 'test-results-ui';
+          ui.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-width: 400px;
+            z-index: 10000;
+            font-family: monospace;
+            font-size: 12px;
+          `;
+
+          const passRate = ((this.passCount / this.tests.length) * 100).toFixed(1);
+          const color = this.failCount === 0 ? '#10b981' : '#ef4444';
+
+          ui.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">
+              🧪 Test Results
+            </div>
+            <div style="margin-bottom: 8px;">
+              Total: ${this.tests.length} |
+              <span style="color: #10b981;">Pass: ${this.passCount}</span> |
+              <span style="color: #ef4444;">Fail: ${this.failCount}</span>
+            </div>
+            <div style="font-weight: bold; color: ${color};">
+              Success Rate: ${passRate}%
+            </div>
+            <div style="margin-top: 8px; max-height: 200px; overflow-y: auto;">
+              ${this.results.map(r => `
+                <div style="padding: 4px 0; border-bottom: 1px solid #e5e7eb;">
+                  ${r.status === 'pass' ? '✅' : '❌'} ${r.name}
+                  ${r.error ? `<br><span style="color: #ef4444; font-size: 10px;">${r.error}</span>` : ''}
+                </div>
+              `).join('')}
+            </div>
+            <button onclick="document.getElementById('test-results-ui').remove()"
+                    style="margin-top: 12px; padding: 6px 12px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              닫기
+            </button>
+          `;
+
+          document.body.appendChild(ui);
+        }
+      };
+
+      // ========================================
+      // Phase 2: Translation Engine Tests
+      // ========================================
+
+      // Test: cosineSimilarity calculation (Phase 3 함수지만 순수 함수라 Phase 2에 포함)
+      TestRunner.test('cosineSimilarity: identical vectors = 1.0', () => {
+        const vec1 = [1, 0, 0];
+        const vec2 = [1, 0, 0];
+        const sim = cosineSimilarity(vec1, vec2);
+        if (Math.abs(sim - 1.0) > 0.001) {
+          throw new Error(`Expected 1.0, got ${sim}`);
+        }
+      });
+
+      TestRunner.test('cosineSimilarity: orthogonal vectors = 0.0', () => {
+        const vec1 = [1, 0, 0];
+        const vec2 = [0, 1, 0];
+        const sim = cosineSimilarity(vec1, vec2);
+        if (Math.abs(sim - 0.0) > 0.001) {
+          throw new Error(`Expected 0.0, got ${sim}`);
+        }
+      });
+
+      TestRunner.test('cosineSimilarity: invalid vectors = 0', () => {
+        const sim1 = cosineSimilarity(null, [1, 2, 3]);
+        const sim2 = cosineSimilarity([1, 2], [1, 2, 3]);
+        if (sim1 !== 0 || sim2 !== 0) {
+          throw new Error('Invalid vectors should return 0');
+        }
+      });
+
+      // ========================================
+      // Phase 3: Smart Features Tests
+      // ========================================
+
+      // Note: 실제 embedding API 호출은 비용과 네트워크 문제로 mock 필요
+      // 여기서는 로컬 함수만 테스트
+
+      // ========================================
+      // Phase 4: History & Search Tests
+      // ========================================
+
+      TestRunner.test('formatDate: today shows time only', () => {
+        const now = new Date();
+        const result = formatDate(now.toISOString());
+        // Should be in HH:MM format
+        if (!/^\d{1,2}:\d{2}$/.test(result)) {
+          throw new Error(`Expected time format (HH:MM), got "${result}"`);
+        }
+      });
+
+      TestRunner.test('formatDate: yesterday shows "어제"', () => {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const result = formatDate(yesterday.toISOString());
+        if (result !== '어제') {
+          throw new Error(`Expected "어제", got "${result}"`);
+        }
+      });
+
+      TestRunner.test('formatDate: 3 days ago shows "3일 전"', () => {
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+        const result = formatDate(threeDaysAgo.toISOString());
+        if (result !== '3일 전') {
+          throw new Error(`Expected "3일 전", got "${result}"`);
+        }
+      });
+
+      TestRunner.test('formatDate: 7+ days ago shows full date', () => {
+        const tenDaysAgo = new Date();
+        tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+        const result = formatDate(tenDaysAgo.toISOString());
+        // Should be YYYY. MM. DD format
+        if (!/^\d{4}\. \d{2}\. \d{2}\.$/.test(result)) {
+          throw new Error(`Expected date format (YYYY. MM. DD.), got "${result}"`);
+        }
+      });
+
+      TestRunner.test('escapeHtml: prevents XSS', () => {
+        const malicious = '<script>alert("XSS")<\/script>';
+        const escaped = escapeHtml(malicious);
+        if (escaped.includes('<script>')) {
+          throw new Error('HTML tags should be escaped');
+        }
+        if (!escaped.includes('&lt;') || !escaped.includes('&gt;')) {
+          throw new Error('Expected &lt; and &gt; entities');
+        }
+      });
+
+      // ========================================
+      // Phase 5: Data Management Tests
+      // ========================================
+
+      TestRunner.test('Database: opens successfully', async () => {
+        if (!db.isOpen()) {
+          await db.open();
+        }
+        if (!db.isOpen()) {
+          throw new Error('Database failed to open');
+        }
+      });
+
+      TestRunner.test('Database: can add translation', async () => {
+        const testTranslation = {
+          id: 'test-' + Date.now(),
+          koreanText: '테스트 한국어',
+          englishText: 'Test English',
+          model: 'gemini-2.5-flash-lite',
+          style: 'casual-work',
+          category: null,
+          embedding: null,
+          isFavorite: false,
+          timestamp: new Date().toISOString(),
+          metadata: { charCount: 10, tokenCount: 5, confidence: 0.9 }
+        };
+
+        await db.translations.add(testTranslation);
+        const retrieved = await db.translations.get(testTranslation.id);
+
+        if (!retrieved || retrieved.koreanText !== testTranslation.koreanText) {
+          throw new Error('Translation not saved correctly');
+        }
+
+        // Cleanup
+        await db.translations.delete(testTranslation.id);
+      });
+
+      TestRunner.test('Database: can update translation', async () => {
+        const testId = 'test-update-' + Date.now();
+        await db.translations.add({
+          id: testId,
+          koreanText: '원본',
+          englishText: 'Original',
+          model: 'gemini-2.5-flash-lite',
+          style: 'casual-work',
+          category: null,
+          embedding: null,
+          isFavorite: false,
+          timestamp: new Date().toISOString(),
+          metadata: { charCount: 2, tokenCount: 1, confidence: 0.9 }
+        });
+
+        await updateTranslation(testId, { isFavorite: true });
+        const updated = await db.translations.get(testId);
+
+        if (!updated.isFavorite) {
+          throw new Error('Translation update failed');
+        }
+
+        // Cleanup
+        await db.translations.delete(testId);
+      });
+
+      TestRunner.test('Database: can delete translation', async () => {
+        const testId = 'test-delete-' + Date.now();
+        await db.translations.add({
+          id: testId,
+          koreanText: '삭제 테스트',
+          englishText: 'Delete test',
+          model: 'gemini-2.5-flash-lite',
+          style: 'casual-work',
+          category: null,
+          embedding: null,
+          isFavorite: false,
+          timestamp: new Date().toISOString(),
+          metadata: { charCount: 6, tokenCount: 2, confidence: 0.9 }
+        });
+
+        await deleteTranslation(testId);
+        const deleted = await db.translations.get(testId);
+
+        if (deleted) {
+          throw new Error('Translation deletion failed');
+        }
+      });
+
+      TestRunner.test('Database: can filter by model', async () => {
+        // Add test data
+        const testId1 = 'filter-test-1-' + Date.now();
+        const testId2 = 'filter-test-2-' + Date.now();
+
+        await db.translations.add({
+          id: testId1,
+          koreanText: 'Gemini 테스트',
+          englishText: 'Gemini test',
+          model: 'gemini-2.5-flash-lite',
+          style: 'casual-work',
+          category: null,
+          embedding: null,
+          isFavorite: false,
+          timestamp: new Date().toISOString(),
+          metadata: { charCount: 10, tokenCount: 3, confidence: 0.9 }
+        });
+
+        await db.translations.add({
+          id: testId2,
+          koreanText: 'GPT 테스트',
+          englishText: 'GPT test',
+          model: 'gpt-4o-mini',
+          style: 'casual-work',
+          category: null,
+          embedding: null,
+          isFavorite: false,
+          timestamp: new Date().toISOString(),
+          metadata: { charCount: 8, tokenCount: 2, confidence: 0.9 }
+        });
+
+        const geminiOnly = await db.translations
+          .filter(t => t.model === 'gemini-2.5-flash-lite')
+          .toArray();
+
+        const hasTestGemini = geminiOnly.some(t => t.id === testId1);
+        const hasTestGPT = geminiOnly.some(t => t.id === testId2);
+
+        // Cleanup
+        await db.translations.delete(testId1);
+        await db.translations.delete(testId2);
+
+        if (!hasTestGemini) {
+          throw new Error('Filter should include Gemini translation');
+        }
+        if (hasTestGPT) {
+          throw new Error('Filter should exclude GPT translation');
+        }
+      });
+
+      TestRunner.test('Database: can sort by timestamp', async () => {
+        const testId1 = 'sort-test-1-' + Date.now();
+        const testId2 = 'sort-test-2-' + Date.now();
+
+        const time1 = new Date('2024-01-01').toISOString();
+        const time2 = new Date('2024-12-01').toISOString();
+
+        await db.translations.add({
+          id: testId1,
+          koreanText: '오래된 것',
+          englishText: 'Old one',
+          model: 'gemini-2.5-flash-lite',
+          style: 'casual-work',
+          category: null,
+          embedding: null,
+          isFavorite: false,
+          timestamp: time1,
+          metadata: { charCount: 5, tokenCount: 2, confidence: 0.9 }
+        });
+
+        await db.translations.add({
+          id: testId2,
+          koreanText: '새로운 것',
+          englishText: 'New one',
+          model: 'gemini-2.5-flash-lite',
+          style: 'casual-work',
+          category: null,
+          embedding: null,
+          isFavorite: false,
+          timestamp: time2,
+          metadata: { charCount: 5, tokenCount: 2, confidence: 0.9 }
+        });
+
+        const sorted = await db.translations
+          .orderBy('timestamp')
+          .reverse()
+          .toArray();
+
+        const index1 = sorted.findIndex(t => t.id === testId1);
+        const index2 = sorted.findIndex(t => t.id === testId2);
+
+        // Cleanup
+        await db.translations.delete(testId1);
+        await db.translations.delete(testId2);
+
+        if (index2 >= index1) {
+          throw new Error('Newer item should come before older item in reverse order');
+        }
+      });
+
+      // ========================================
+      // Run all tests after initialization
+      // ========================================
+
+      setTimeout(async () => {
+        console.log('\\n⏳ Starting tests in 2 seconds...\\n');
+        await TestRunner.runAll();
+      }, 2000);
+    }
+  </script>
+</body>
+</html>
