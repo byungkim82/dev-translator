@@ -34,7 +34,7 @@
 ### 백엔드 (Next.js API Routes)
 - **Runtime**: Cloudflare Workers (via OpenNext)
 - **Database**: Cloudflare D1 (SQLite)
-- **AI APIs**: Gemini 2.0 Flash (기본), Claude Haiku, GPT-4o-mini
+- **AI API**: Gemini 2.5 Flash Lite (번역 + 카테고리 분류)
 - **Embedding**: OpenAI text-embedding-3-small
 
 ### 인프라
@@ -69,7 +69,7 @@ dev-translator/
 │   │   ├── history/
 │   │   │   └── route.ts            # GET, POST, DELETE /api/history
 │   │   ├── export/
-│   │   │   └── route.ts            # GET /api/export?format=json|csv
+│   │   │   └── route.ts            # GET /api/export?format=csv
 │   │   ├── categorize/
 │   │   │   └── route.ts            # POST /api/categorize
 │   │   └── settings/
@@ -92,10 +92,8 @@ dev-translator/
 │
 ├── lib/
 │   ├── ai/
-│   │   ├── gemini.ts               # Gemini API 호출
-│   │   ├── claude.ts               # Claude API 호출
-│   │   ├── openai.ts               # OpenAI API 호출
-│   │   └── embedding.ts            # 임베딩 생성
+│   │   ├── gemini.ts               # Gemini 2.5 Flash Lite API 호출
+│   │   └── embedding.ts            # OpenAI 임베딩 생성
 │   ├── prompts.ts                  # 번역 프롬프트 템플릿
 │   ├── similarity.ts               # 코사인 유사도 계산
 │   └── utils.ts                    # 유틸리티 함수
@@ -170,7 +168,7 @@ CREATE TABLE settings (
 | POST | `/api/history` | 번역 저장 (수동) |
 | PATCH | `/api/history` | 번역 수정 (즐겨찾기, 수정 등) |
 | DELETE | `/api/history` | 번역 삭제 |
-| GET | `/api/export` | 내보내기 (?format=json\|csv) |
+| GET | `/api/export` | CSV 내보내기 |
 | POST | `/api/categorize` | 미분류 항목 일괄 분류 |
 | GET | `/api/settings` | 사용자 설정 조회 |
 | PUT | `/api/settings` | 사용자 설정 저장 |
@@ -204,8 +202,7 @@ const email = request.headers.get('cf-access-authenticated-user-email');
 ```
 CLOUDFLARE_API_TOKEN      # Cloudflare API 토큰
 CLOUDFLARE_ACCOUNT_ID     # Cloudflare 계정 ID
-GEMINI_API_KEY            # Gemini API 키
-CLAUDE_API_KEY            # Claude API 키 (선택)
+GEMINI_API_KEY            # Gemini 2.5 Flash Lite API 키
 OPENAI_API_KEY            # OpenAI API 키 (임베딩용)
 ```
 
@@ -213,7 +210,6 @@ OPENAI_API_KEY            # OpenAI API 키 (임베딩용)
 ```bash
 # .dev.vars (gitignore에 추가)
 GEMINI_API_KEY=your-gemini-key
-CLAUDE_API_KEY=your-claude-key
 OPENAI_API_KEY=your-openai-key
 ```
 
@@ -231,7 +227,7 @@ OPENAI_API_KEY=your-openai-key
 - [ ] env.d.ts 타입 정의
 
 ### Phase 2: 핵심 번역 기능
-- [ ] Gemini 2.0 Flash API 연동
+- [ ] Gemini 2.5 Flash Lite API 연동
 - [ ] 번역 프롬프트 템플릿 (4가지 스타일)
 - [ ] /api/translate API Route
 - [ ] TranslateForm 컴포넌트
@@ -254,7 +250,7 @@ OPENAI_API_KEY=your-openai-key
 - [ ] SimilarModal 컴포넌트
 
 ### Phase 5: 데이터 관리 & 설정
-- [ ] /api/export API Route (JSON, CSV)
+- [ ] /api/export API Route (CSV)
 - [ ] /api/categorize API Route (자동 분류)
 - [ ] /api/settings API Route
 - [ ] 설정 페이지 UI
@@ -329,7 +325,7 @@ jobs:
 | 백엔드 | 없음 (클라이언트 직접 호출) | Next.js API Routes on Workers |
 | 데이터베이스 | IndexedDB (로컬) | Cloudflare D1 (서버) |
 | 인증 | 없음 | Cloudflare Access (선택) |
-| AI 기본 모델 | Gemini Flash | **Gemini 2.0 Flash** |
+| AI 기본 모델 | Gemini Flash | **Gemini 2.5 Flash Lite** |
 | API 키 관리 | 로컬 암호화 저장 | 서버 환경변수 |
 | 배포 | 수동 (파일 공유) | GitHub Actions 자동화 |
 | 접근성 | 로컬 브라우저만 | 어디서나 (URL 접속) |
@@ -354,35 +350,27 @@ jobs:
 
 ---
 
-## 12. 확인 필요 사항
+## 12. 확정된 설정
 
-계획 승인 전 확인이 필요합니다:
-
-### 필수 확인
-1. **Cloudflare 계정**: 이미 있는지? 없다면 생성 필요
-2. **GitHub 리포**: byungkim82/dev-translator 사용할지?
-
-### 선택 사항
-3. **인증 방식**:
-   - A) Cloudflare Access (이메일 화이트리스트)
-   - B) 인증 없이 (URL 비공개로 보안)
-
-4. **AI 모델 선택**:
-   - Gemini 2.0 Flash만? (기본)
-   - Claude Haiku, GPT-4o-mini도 추가?
-
-5. **기능 범위**:
-   - 유사 번역 검색 (임베딩) 필요?
-   - 자동 카테고리 분류 필요?
-   - PDF Export 필요? (서버사이드 PDF 복잡함)
-
-6. **커스텀 도메인**: 사용할 도메인 있는지?
+| 항목 | 결정 |
+|------|------|
+| Cloudflare 계정 | 있음 |
+| GitHub 리포 | byungkim82/dev-translator |
+| 인증 방식 | Cloudflare Access (이메일 화이트리스트) |
+| AI 모델 | **Gemini 2.5 Flash Lite** |
+| 유사 번역 검색 | 포함 (임베딩 기반) |
+| 자동 카테고리 분류 | 포함 |
+| Export | CSV만 (PDF 제외) |
+| 도메인 | Workers 기본 URL 사용 |
 
 ---
 
-## 13. 다음 단계
+## 13. 구현 시작
 
-확인 사항에 대한 답변 후:
-1. Phase 1부터 순차 구현
-2. 각 Phase 완료 시 커밋 & 푸시
-3. 전체 완료 후 PR 생성
+계획 확정됨. Phase 1부터 순차 구현 진행:
+1. Phase 1: 프로젝트 초기 설정
+2. Phase 2: 핵심 번역 기능
+3. Phase 3: 히스토리 & 검색
+4. Phase 4: 유사 번역 검색
+5. Phase 5: 데이터 관리 & 설정
+6. Phase 6: CI/CD & 배포
