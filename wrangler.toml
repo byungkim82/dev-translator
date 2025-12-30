@@ -1,0 +1,17 @@
+name = "dev-translator"
+main = ".open-next/worker.js"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Assets directory for static files
+assets = { directory = ".open-next/assets", binding = "ASSETS" }
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "dev-translator-db"
+database_id = "" # Will be filled after db:create
+
+# Environment variables (secrets set via wrangler secret)
+[vars]
+NODE_ENV = "production"

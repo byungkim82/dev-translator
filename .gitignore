@@ -1,41 +1,47 @@
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
+# Dependencies
+node_modules/
+.pnpm-store/
 
-# Thumbnails
-._*
+# Next.js
+.next/
+out/
 
-# Files that might appear in the root of a volume
-.DocumentRevisions-V100
-.fseventsd
-.Spotlight-V100
-.TemporaryItems
-.Trashes
-.VolumeIcon.icns
-.com.apple.timemachine.donotpresent
+# OpenNext build output
+.open-next/
 
-# Directories potentially created on remote AFP share
-.AppleDB
-.AppleDesktop
-Network Trash Folder
-Temporary Items
-.aenigma
+# Production
+build/
+dist/
 
-# Editor directories and files
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.dev.vars
+
+# TypeScript
+*.tsbuildinfo
+
+# IDEs
+.idea/
 .vscode/*
 !.vscode/extensions.json
-.idea
 *.swp
 *.swo
 *~
 
-# Node (if you add Playwright later)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-package-lock.json
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
 
 # Test results
 test-results/
@@ -45,11 +51,5 @@ playwright-report/
 *.log
 logs/
 
-# Environment variables (if you add any)
-.env
-.env.local
-.env.*.local
-
-# Build outputs (future use)
-dist/
-build/
+# Misc
+Thumbs.db
