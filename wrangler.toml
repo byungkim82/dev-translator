@@ -10,7 +10,7 @@ assets = { directory = ".open-next/assets", binding = "ASSETS" }
 [[d1_databases]]
 binding = "DB"
 database_name = "dev-translator-db"
-database_id = "" # Will be filled after db:create
+database_id = "cccd2aaa-6198-4d11-bea6-6b8d80f0a3fe"
 
 # Environment variables (secrets set via wrangler secret)
 [vars]
