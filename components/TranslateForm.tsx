@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface TranslateFormProps {
   onTranslate: (koreanText: string, model: string, style: string) => Promise<void>;
   isLoading: boolean;
+  defaultModel?: string;
+  defaultStyle?: string;
 }
 
 const MODELS = [
@@ -19,10 +21,24 @@ const STYLES = [
   { value: "technical-doc", label: "기술 문서용" },
 ];
 
-export function TranslateForm({ onTranslate, isLoading }: TranslateFormProps) {
+export function TranslateForm({
+  onTranslate,
+  isLoading,
+  defaultModel = "gemini-flash-lite",
+  defaultStyle = "casual-work",
+}: TranslateFormProps) {
   const [koreanText, setKoreanText] = useState("");
-  const [model, setModel] = useState("gemini-flash-lite");
-  const [style, setStyle] = useState("casual-work");
+  const [model, setModel] = useState(defaultModel);
+  const [style, setStyle] = useState(defaultStyle);
+
+  // Update state when default props change
+  useEffect(() => {
+    setModel(defaultModel);
+  }, [defaultModel]);
+
+  useEffect(() => {
+    setStyle(defaultStyle);
+  }, [defaultStyle]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

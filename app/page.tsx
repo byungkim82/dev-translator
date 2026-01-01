@@ -4,7 +4,7 @@ import { TranslateForm } from "@/components/TranslateForm";
 import { TranslationResult } from "@/components/TranslationResult";
 import { SimilarModal } from "@/components/SimilarModal";
 import { Toast } from "@/components/Toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export interface Translation {
   id: string;
@@ -21,6 +21,12 @@ export interface SimilarTranslation extends Translation {
   similarity: number;
 }
 
+interface Settings {
+  default_model: string;
+  default_style: string;
+  auto_copy: number;
+}
+
 export default function HomePage() {
   const [result, setResult] = useState<Translation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,11 +38,32 @@ export default function HomePage() {
     style: string;
   } | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+  const [settings, setSettings] = useState<Settings>({
+    default_model: "gemini-flash-lite",
+    default_style: "casual-work",
+    auto_copy: 0,
+  });
 
   const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
+
+  useEffect(() => {
+    // Fetch settings on mount
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch("/api/settings");
+        if (res.ok) {
+          const data = await res.json() as { settings: Settings };
+          setSettings(data.settings);
+        }
+      } catch (error) {
+        console.error("Failed to fetch settings:", error);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const handleTranslate = async (koreanText: string, model: string, style: string) => {
     if (!koreanText.trim()) {
@@ -151,7 +178,12 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6">
-      <TranslateForm onTranslate={handleTranslate} isLoading={isLoading} />
+      <TranslateForm
+        onTranslate={handleTranslate}
+        isLoading={isLoading}
+        defaultModel={settings.default_model}
+        defaultStyle={settings.default_style}
+      />
 
       {result && (
         <TranslationResult
