@@ -55,7 +55,7 @@ export async function GET() {
 
     return NextResponse.json({
       settings: settings || {
-        default_model: "gemini-flash",
+        default_model: "gemini-flash-lite",
         default_style: "casual-work",
         auto_copy: 0,
       },
@@ -90,7 +90,7 @@ export async function PUT(request: NextRequest) {
          updated_at = excluded.updated_at`
     )
       .bind(
-        default_model || "gemini-flash",
+        default_model || "gemini-flash-lite",
         default_style || "casual-work",
         auto_copy ? 1 : 0,
         now

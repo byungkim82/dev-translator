@@ -8,7 +8,8 @@ interface TranslateFormProps {
 }
 
 const MODELS = [
-  { value: "gemini-flash", label: "Gemini Flash" },
+  { value: "gemini-flash-lite", label: "Gemini 2.5 Flash Lite (추천)" },
+  { value: "gemini-3-flash", label: "Gemini 3 Flash (실험적)" },
 ];
 
 const STYLES = [
@@ -20,7 +21,7 @@ const STYLES = [
 
 export function TranslateForm({ onTranslate, isLoading }: TranslateFormProps) {
   const [koreanText, setKoreanText] = useState("");
-  const [model, setModel] = useState("gemini-flash");
+  const [model, setModel] = useState("gemini-flash-lite");
   const [style, setStyle] = useState("casual-work");
 
   const handleSubmit = async (e: React.FormEvent) => {

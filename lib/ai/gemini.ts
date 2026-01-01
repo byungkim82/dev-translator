@@ -1,4 +1,9 @@
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent";
+const GEMINI_MODELS = {
+  "gemini-flash-lite": "gemini-2.5-flash-lite",
+  "gemini-3-flash": "gemini-3-flash-preview",
+} as const;
+
+type GeminiModelKey = keyof typeof GEMINI_MODELS;
 
 interface GeminiResponse {
   candidates: Array<{
@@ -10,8 +15,16 @@ interface GeminiResponse {
   }>;
 }
 
-export async function callGemini(prompt: string, apiKey: string): Promise<string> {
-  const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+export async function callGemini(
+  prompt: string,
+  apiKey: string,
+  model: string = "gemini-flash-lite"
+): Promise<string> {
+  // Map user-facing model name to API model name, with fallback
+  const modelName = GEMINI_MODELS[model as GeminiModelKey] || GEMINI_MODELS["gemini-flash-lite"];
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+
+  const response = await fetch(`${apiUrl}?key=${apiKey}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

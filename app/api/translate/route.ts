@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     // Build prompt and translate
     const prompt = buildTranslationPrompt(koreanText, style || "casual-work");
-    const englishText = await callGemini(prompt, cfEnv.GEMINI_API_KEY);
+    const englishText = await callGemini(prompt, cfEnv.GEMINI_API_KEY, model || "gemini-flash-lite");
 
     // Generate embedding if OpenAI key is available
     let embedding: number[] | null = null;

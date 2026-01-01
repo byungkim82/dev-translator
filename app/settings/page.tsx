@@ -18,7 +18,7 @@ interface Stats {
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>({
-    default_model: "gemini-flash",
+    default_model: "gemini-flash-lite",
     default_style: "casual-work",
     auto_copy: 0,
   });
@@ -120,7 +120,8 @@ export default function SettingsPage() {
               onChange={(e) => setSettings({ ...settings, default_model: e.target.value })}
               className="w-full p-3 border border-gray-200 rounded-md focus:outline-none focus:border-primary"
             >
-              <option value="gemini-flash">Gemini Flash</option>
+              <option value="gemini-flash-lite">Gemini 2.5 Flash Lite (추천)</option>
+              <option value="gemini-3-flash">Gemini 3 Flash (실험적)</option>
             </select>
           </div>
 
