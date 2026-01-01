@@ -55,7 +55,7 @@ export function SimilarModal({
         <div className="p-6 border-t flex gap-3">
           <button
             onClick={onTranslateNew}
-            className="flex-1 py-3 px-4 bg-primary text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
+            className="flex-1 py-3 px-4 bg-gradient-primary text-white rounded-md hover:opacity-90 shadow-md transition-all font-medium"
           >
             새로 번역
           </button>

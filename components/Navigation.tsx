@@ -22,7 +22,7 @@ export function Navigation() {
             href={tab.href}
             className={`flex-1 py-3 px-4 text-center text-sm font-medium rounded-md transition-all ${
               isActive
-                ? "bg-primary text-white"
+                ? "bg-gradient-primary text-white shadow-md"
                 : "text-gray-500 hover:bg-gray-100"
             }`}
           >

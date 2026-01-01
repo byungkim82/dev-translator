@@ -84,7 +84,7 @@ export function TranslateForm({ onTranslate, isLoading }: TranslateFormProps) {
       <button
         type="submit"
         disabled={isLoading || !koreanText.trim()}
-        className="w-full py-3 px-6 bg-primary text-white font-medium rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+        className="w-full py-3 px-6 bg-gradient-primary text-white font-medium rounded-md hover:opacity-90 shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
       >
         {isLoading ? (
           <>

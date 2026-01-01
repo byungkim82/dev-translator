@@ -154,7 +154,7 @@ export default function SettingsPage() {
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="w-full py-3 bg-primary text-white rounded-md hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            className="w-full py-3 bg-gradient-primary text-white rounded-md hover:opacity-90 shadow-md disabled:opacity-50 transition-all"
           >
             {isSaving ? "저장 중..." : "설정 저장"}
           </button>
