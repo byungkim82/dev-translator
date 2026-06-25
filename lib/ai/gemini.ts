@@ -1,6 +1,8 @@
 const GEMINI_MODELS = {
-  "gemini-flash-lite": "gemini-2.5-flash-lite",
-  "gemini-3-flash": "gemini-3-flash-preview",
+  // Stable values shown to users are kept as keys (stored in DB); only the
+  // underlying API model is upgraded to the current GA models (June 2026).
+  "gemini-flash-lite": "gemini-3.1-flash-lite", // default: fast, cheap, GA
+  "gemini-3-flash": "gemini-3.5-flash", // premium: highest quality, GA
 } as const;
 
 type GeminiModelKey = keyof typeof GEMINI_MODELS;

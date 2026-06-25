@@ -126,8 +126,8 @@ export default function SettingsPage() {
               onChange={(e) => setSettings({ ...settings, default_model: e.target.value })}
               className="w-full p-3 border border-gray-200 rounded-md focus:outline-none focus:border-primary"
             >
-              <option value="gemini-flash-lite">Gemini 2.5 Flash Lite (추천)</option>
-              <option value="gemini-3-flash">Gemini 3 Flash (실험적)</option>
+              <option value="gemini-flash-lite">Gemini 3.1 Flash Lite (추천)</option>
+              <option value="gemini-3-flash">Gemini 3.5 Flash (고품질)</option>
             </select>
           </div>
 

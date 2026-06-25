@@ -10,8 +10,8 @@ interface TranslateFormProps {
 }
 
 const MODELS = [
-  { value: "gemini-flash-lite", label: "Gemini 2.5 Flash Lite (추천)" },
-  { value: "gemini-3-flash", label: "Gemini 3 Flash (실험적)" },
+  { value: "gemini-flash-lite", label: "Gemini 3.1 Flash Lite (추천)" },
+  { value: "gemini-3-flash", label: "Gemini 3.5 Flash (고품질)" },
 ];
 
 const STYLES = [
