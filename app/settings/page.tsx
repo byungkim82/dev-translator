@@ -7,6 +7,9 @@ interface Settings {
   default_model: string;
   default_style: string;
   auto_copy: number;
+  user_role: string;
+  company_size: string;
+  audience: string;
 }
 
 interface Stats {
@@ -21,6 +24,9 @@ export default function SettingsPage() {
     default_model: "gemini-flash-lite",
     default_style: "casual-work",
     auto_copy: 0,
+    user_role: "",
+    company_size: "",
+    audience: "",
   });
   const [stats, setStats] = useState<Stats>({
     total: 0,
@@ -149,6 +155,62 @@ export default function SettingsPage() {
               />
               <span className="text-sm">번역 후 자동으로 클립보드에 복사</span>
             </label>
+          </div>
+
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="w-full py-3 bg-gradient-primary text-white rounded-md hover:opacity-90 shadow-md disabled:opacity-50 transition-all"
+          >
+            {isSaving ? "저장 중..." : "설정 저장"}
+          </button>
+        </div>
+      </section>
+
+      {/* User Context Profile */}
+      <section className="bg-white rounded-lg p-6 shadow-sm">
+        <h2 className="text-lg font-semibold mb-1">내 프로필</h2>
+        <p className="text-sm text-gray-500 mb-4">번역 시 컨텍스트로 활용됩니다. 비워두면 사용하지 않습니다.</p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">내 직군</label>
+            <input
+              type="text"
+              value={settings.user_role}
+              onChange={(e) => setSettings({ ...settings, user_role: e.target.value })}
+              placeholder="예: Software Engineer, Product Manager, Designer"
+              className="w-full p-3 border border-gray-200 rounded-md focus:outline-none focus:border-primary text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">회사 규모</label>
+            <select
+              value={settings.company_size}
+              onChange={(e) => setSettings({ ...settings, company_size: e.target.value })}
+              className="w-full p-3 border border-gray-200 rounded-md focus:outline-none focus:border-primary text-sm"
+            >
+              <option value="">선택 안 함</option>
+              <option value="startup">스타트업 (Startup)</option>
+              <option value="mid-size">중견기업 (Mid-size)</option>
+              <option value="large enterprise">대기업 (Enterprise)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">주요 대화 상대</label>
+            <select
+              value={settings.audience}
+              onChange={(e) => setSettings({ ...settings, audience: e.target.value })}
+              className="w-full p-3 border border-gray-200 rounded-md focus:outline-none focus:border-primary text-sm"
+            >
+              <option value="">선택 안 함</option>
+              <option value="a teammate">팀원 (Teammate)</option>
+              <option value="my manager">매니저 (Manager)</option>
+              <option value="a cross-functional partner">타 직군 파트너 (Cross-functional)</option>
+              <option value="an external stakeholder">외부 이해관계자 (External)</option>
+            </select>
           </div>
 
           <button

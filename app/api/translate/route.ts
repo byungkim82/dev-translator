@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { callGemini } from "@/lib/ai/gemini";
 import { getEmbedding } from "@/lib/ai/embedding";
-import { buildTranslationPrompt } from "@/lib/prompts";
+import { buildTranslationPrompt, type UserContext } from "@/lib/prompts";
 import { generateId, estimateTokens } from "@/lib/utils";
 
 export async function POST(request: NextRequest) {
@@ -27,9 +27,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Load user context from settings
+    const settingsRow = await cfEnv.DB.prepare(
+      "SELECT user_role, company_size, audience FROM settings WHERE id = 'default'"
+    ).first<UserContext>();
+    const userContext: UserContext = settingsRow || {};
+
     // Build prompt and translate
-    const prompt = buildTranslationPrompt(koreanText, style || "casual-work");
-    const englishText = await callGemini(prompt, cfEnv.GEMINI_API_KEY, model || "gemini-flash-lite");
+    const prompt = buildTranslationPrompt(koreanText, style || "casual-work", userContext);
+    const englishText = await callGemini(prompt, cfEnv.GEMINI_API_KEY, model || "gemini-flash-lite", style || "casual-work");
 
     // Generate embedding if OpenAI key is available
     let embedding: number[] | null = null;

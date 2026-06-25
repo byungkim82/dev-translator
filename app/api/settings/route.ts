@@ -6,6 +6,9 @@ interface Settings {
   default_model: string;
   default_style: string;
   auto_copy: number;
+  user_role: string;
+  company_size: string;
+  audience: string;
 }
 
 interface Stats {
@@ -58,6 +61,9 @@ export async function GET() {
         default_model: "gemini-flash-lite",
         default_style: "casual-work",
         auto_copy: 0,
+        user_role: "",
+        company_size: "",
+        audience: "",
       },
       stats,
     });
@@ -75,24 +81,30 @@ export async function PUT(request: NextRequest) {
     const { env } = await getCloudflareContext();
     const cfEnv = env as CloudflareEnv;
 
-    const body = await request.json() as { default_model?: string; default_style?: string; auto_copy?: boolean | number };
-    const { default_model, default_style, auto_copy } = body;
+    const body = await request.json() as { default_model?: string; default_style?: string; auto_copy?: boolean | number; user_role?: string; company_size?: string; audience?: string };
+    const { default_model, default_style, auto_copy, user_role, company_size, audience } = body;
 
     const now = new Date().toISOString();
 
     await cfEnv.DB.prepare(
-      `INSERT INTO settings (id, default_model, default_style, auto_copy, updated_at)
-       VALUES ('default', ?, ?, ?, ?)
+      `INSERT INTO settings (id, default_model, default_style, auto_copy, user_role, company_size, audience, updated_at)
+       VALUES ('default', ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          default_model = excluded.default_model,
          default_style = excluded.default_style,
          auto_copy = excluded.auto_copy,
+         user_role = excluded.user_role,
+         company_size = excluded.company_size,
+         audience = excluded.audience,
          updated_at = excluded.updated_at`
     )
       .bind(
         default_model || "gemini-flash-lite",
         default_style || "casual-work",
         auto_copy ? 1 : 0,
+        user_role || "",
+        company_size || "",
+        audience || "",
         now
       )
       .run();

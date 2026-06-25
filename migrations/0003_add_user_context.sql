@@ -1,0 +1,3 @@
+ALTER TABLE settings ADD COLUMN user_role TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN company_size TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN audience TEXT DEFAULT '';
