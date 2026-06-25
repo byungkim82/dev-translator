@@ -9,6 +9,9 @@ out/
 # OpenNext build output
 .open-next/
 
+# Wrangler (Cloudflare local state)
+.wrangler/
+
 # Production
 build/
 dist/
