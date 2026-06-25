@@ -13,7 +13,7 @@
 - **Database**: Cloudflare D1 (SQLite)
 - **Styling**: Tailwind CSS v4
 - **State Management**: TanStack Query for client-side data fetching
-- **AI**: Gemini 2.5 Flash Lite for translation, OpenAI text-embedding-3-small for similarity search
+- **AI**: Gemini 3.1 Flash Lite (default) / Gemini 3.5 Flash (high-quality option) for translation, OpenAI text-embedding-3-small for similarity search
 
 ### Project Structure
 ```
@@ -63,7 +63,7 @@ dev-translator/
 
 ### 1. Translation (Main Page)
 - Korean text input with model and style selection
-- Single AI model: Gemini 2.5 Flash Lite
+- Two model options: Gemini 3.1 Flash Lite (default, fast/cheap) and Gemini 3.5 Flash (higher quality)
 - 4 translation styles:
   - Casual work (캐주얼 업무용) - default
   - Formal work (격식있는 업무용)
