@@ -49,6 +49,17 @@ export default function HomePage() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  // Auto-copy the result to the clipboard when the setting is enabled, so the
+  // user can paste straight into Slack without clicking the copy button.
+  const autoCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("자동 복사됨 — Slack에 붙여넣으세요", "success");
+    } catch {
+      showToast("자동 복사 실패 — 복사 버튼을 눌러주세요", "error");
+    }
+  };
+
   useEffect(() => {
     // Fetch settings on mount
     const fetchSettings = async () => {
@@ -118,7 +129,11 @@ export default function HomePage() {
 
       const translation = await res.json() as Translation;
       setResult(translation);
-      showToast("번역이 완료되었습니다", "success");
+      if (settings.auto_copy) {
+        await autoCopy(translation.english_text);
+      } else {
+        showToast("번역이 완료되었습니다", "success");
+      }
     } catch (error) {
       console.error("Translation error:", error);
       showToast(error instanceof Error ? error.message : "번역 중 오류가 발생했습니다", "error");
@@ -135,7 +150,11 @@ export default function HomePage() {
     setShowSimilarModal(false);
     setSimilarTranslations([]);
     setPendingTranslation(null);
-    showToast("기존 번역을 사용했습니다", "success");
+    if (settings.auto_copy) {
+      void autoCopy(translation.english_text);
+    } else {
+      showToast("기존 번역을 사용했습니다", "success");
+    }
   };
 
   const handleTranslateNew = async () => {
