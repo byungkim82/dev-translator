@@ -159,11 +159,10 @@ npm run deploy  # Deploy to Cloudflare Workers
 
 ## CI/CD
 
-GitHub Actions workflow (.github/workflows/deploy.yml):
-- Triggers on push to main branch
-- Runs migrations
-- Builds and deploys to Cloudflare Workers
-- Requires GitHub secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+GitHub Actions workflow (.github/workflows/deploy.yml), on push to main:
+- `verify` job (gate): runs lint + tests (`npm run lint`, `npm run test:run`)
+- `deploy` job (`needs: verify`, runs only after verify passes): builds with OpenNext, applies D1 migrations, syncs secrets, deploys to Cloudflare Workers
+- Requires GitHub secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID (plus GEMINI_API_KEY, OPENAI_API_KEY for secret sync)
 
 ## Authentication
 

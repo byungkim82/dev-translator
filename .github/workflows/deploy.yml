@@ -6,7 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  # Gate: lint + tests must pass before anything is deployed.
+  verify:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,6 +25,27 @@ jobs:
 
       - name: Run lint
         run: npm run lint
+
+      - name: Run tests
+        run: npm run test:run
+
+  deploy:
+    # Only starts once `verify` (lint + tests) has succeeded.
+    needs: verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Build with OpenNext
         run: npm run build
