@@ -62,7 +62,8 @@
 
 ### Q1 · 용어집(Glossary) / 고정 번역 사전 — 🔴 M
 회사 제품명·내부 약어·팀 이름·고유명사를 "이건 이렇게 번역 / 절대 번역 안 함"으로 등록해 프롬프트에 주입. 매번 같은 단어를 손으로 고치는 일을 제거.
-**관련 코드:** `lib/prompts.ts`(주입), `migrations/`(glossary 테이블), settings UI.
+**📐 설계안:** [`docs/Q1-glossary-design.md`](./Q1-glossary-design.md) — 유사 도구 리서치(DeepL·Google·Lokalise·memoQ 등) 반영. 데이터 모델·한국어 조사 대응 매칭·프롬프트 주입·캐시(W9) 정합성·테스트·PR 분할 포함. **구현 착수 전 미결정 3건**(forbidden_term/캐시 시그니처/매칭 정밀도) 확정 필요.
+**관련 코드:** `lib/prompts.ts`(주입), `lib/glossary.ts`(신규: 매칭/주입/시그니처), `app/api/translate/route.ts`, `lib/cache.ts`(캐시 키), `migrations/0004_create_glossary.sql`(신규), settings UI.
 
 ### Q2 · 코드/영어 혼용 입력 보존 — 🔴 S — ✅
 "이 PR을 merge 했고 staging에 deploy 했어" 같은 입력에서 `merge`/`deploy`/함수명/변수명을 그대로 유지하도록 프롬프트에 명시.
