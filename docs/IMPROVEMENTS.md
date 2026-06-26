@@ -43,6 +43,7 @@
 | T16 | 유사 검색을 Cloudflare Vectorize로 이전 | 기술 | 🟡 | L | 🔲 |
 | T17 | Gemini 호출 타임아웃/재시도 | 기술 | 🟡 | S | 🔲 |
 | T18 | 테스트 기반 구축 (Vitest + 순수 함수 유닛 테스트) | 기술 | 🟡 | M | ✅ |
+| T19 | GitHub Actions 액션 버전 업그레이드 (checkout/setup-node v4→v5) | 기술 | 🟢 | S | 🔲 |
 
 ---
 
@@ -160,6 +161,10 @@ B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣
 - 유닛 테스트 32개 (4파일): `lib/similarity.test.ts`(코사인·임계값·정렬·잘못된 임베딩 스킵), `lib/prompts.test.ts`(맥락 주입·스타일 fallback·카테고리), `lib/utils.test.ts`(토큰 추정·UUID), `lib/ai/gemini.test.ts`(따옴표/접두사 후처리)
 - `lib/ai/gemini.ts`의 후처리 로직을 `cleanGeminiOutput()`로 추출해 API 호출 없이 테스트 가능하게 리팩터
 **향후 확장:** `@cloudflare/vitest-pool-workers`로 D1 연동 API 라우트 테스트까지 확대(별도 항목으로 분리 가능).
+
+### T19 · GitHub Actions 액션 버전 업그레이드 — 🟢 S
+배포 run에서 GitHub 경고: "Node.js 20 is deprecated — `actions/checkout@v4`, `actions/setup-node@v4`가 Node 24에서 강제 실행됨". 비차단(런은 성공)이지만 `actions/checkout@v5`·`actions/setup-node@v5`로 올려 정리. 참고로 이 경고는 앱이 쓰는 Node가 아니라 *액션 런타임*에 대한 것. (선택: job의 `node-version`도 로컬과 같은 22로 상향 고려.)
+**관련 코드:** `.github/workflows/deploy.yml`.
 
 ---
 
