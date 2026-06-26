@@ -25,7 +25,7 @@
 |----|------|------|:---:|:---:|:---:|
 | B1 | `auto_copy` 설정이 동작하지 않음 | Bug | 🔴 | S | ✅ |
 | B2 | DB에 잘못된 모델명 저장 | Bug | 🟡 | S | ✅ |
-| Q1 | 용어집(Glossary) / 고정 번역 사전 | 품질 | 🔴 | M | 🔲 |
+| Q1 | 용어집(Glossary) — 간단 버전(자유 텍스트 지침) | 품질 | 🔴 | M | ✅ |
 | Q2 | 코드/영어 혼용 입력 보존 | 품질 | 🔴 | S | ✅ |
 | Q3 | 답장 맥락(원문 메시지) 입력 | 품질 | 🟡 | M | 🔲 |
 | Q4 | 번역 후 미세 조정(refine/regenerate) | 품질 | 🟡 | M | 🔲 |
@@ -60,10 +60,12 @@
 
 ## 🎯 번역 품질 (Quality) — 수작업 교정 최소화 직결
 
-### Q1 · 용어집(Glossary) / 고정 번역 사전 — 🔴 M
-회사 제품명·내부 약어·팀 이름·고유명사를 "이건 이렇게 번역 / 절대 번역 안 함"으로 등록해 프롬프트에 주입. 매번 같은 단어를 손으로 고치는 일을 제거.
-**📐 설계안:** [`docs/Q1-glossary-design.md`](./Q1-glossary-design.md) — 유사 도구 리서치(DeepL·Google·Lokalise·memoQ 등) 반영. 데이터 모델·한국어 조사 대응 매칭·프롬프트 주입·캐시(W9) 정합성·테스트·PR 분할 포함. **구현 착수 전 미결정 3건**(forbidden_term/캐시 시그니처/매칭 정밀도) 확정 필요.
-**관련 코드:** `lib/prompts.ts`(주입), `lib/glossary.ts`(신규: 매칭/주입/시그니처), `app/api/translate/route.ts`, `lib/cache.ts`(캐시 키), `migrations/0004_create_glossary.sql`(신규), settings UI.
+### Q1 · 용어집(Glossary) — 🔴 M — ✅ (간단 버전)
+회사 용어·고유명사의 반복 교정 제거. **사용자 우려(복잡도·기존 기능 회귀 위험·이해 가능성)를 반영해 "간단 버전"으로 구현**: 새 테이블/한국어 매칭/캐시 변경 없이, 설정의 자유 텍스트 '용어/번역 지침' 필드를 프롬프트에 그대로 덧붙임. 기존 사용자 컨텍스트 주입과 동일 패턴. **비우면 프롬프트가 기존과 글자 단위로 동일(무회귀).**
+**완료 범위:** `migrations/0004_add_glossary_to_settings.sql`(settings에 `glossary` 컬럼), `lib/prompts.ts`의 `buildGlossaryLine` + `buildTranslationPrompt` 4번째 인자 주입, `app/api/translate/route.ts`(로드·전달), `app/api/settings/route.ts`(저장), `app/settings/page.tsx`(텍스트영역 UI).
+**테스트:** `lib/prompts.test.ts` — 주입/생략·빈 입력 no-op (유닛 4개).
+**알려진 제약:** 지침을 수정해도 W9 캐시에 이미 있는 *동일 입력*은 옛 결과 반환(새 입력엔 즉시 반영) → Q4의 "새로 번역"으로 우회 예정.
+**📐 전체 설계(보류):** [`docs/Q1-glossary-design.md`](./Q1-glossary-design.md) — 테이블 + 한국어 조사 매칭 + 캐시 시그니처 + CRUD UI. 용어가 수백 개 규모로 커지면 그때 승격.
 
 ### Q2 · 코드/영어 혼용 입력 보존 — 🔴 S — ✅
 "이 PR을 merge 했고 staging에 deploy 했어" 같은 입력에서 `merge`/`deploy`/함수명/변수명을 그대로 유지하도록 프롬프트에 명시.
@@ -192,3 +194,4 @@ B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣
 | B1+W8 | 자동 복사 작동 (`auto_copy` 연결 + 토스트, 컴포넌트 테스트 환경 구축) | 2026-06-25 | `2e42570` |
 | W9 | 정확 일치 캐시 (키 = 텍스트+style+model, 가시화는 Q4) | 2026-06-25 | `6c82b66` |
 | Q2 | 코드/영어 혼용 입력 보존 (프롬프트 공통 규칙) | 2026-06-25 | `2eb7166` |
+| Q1 | 용어집 간단 버전 (설정 자유 텍스트 지침 → 프롬프트 주입) | 2026-06-25 | `3088168` |
