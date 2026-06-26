@@ -2,7 +2,7 @@
 
 import { TranslateForm } from "@/components/TranslateForm";
 import { TranslationResult } from "@/components/TranslationResult";
-import { SimilarModal } from "@/components/SimilarModal";
+import { SimilarSuggestions } from "@/components/SimilarSuggestions";
 import { Toast } from "@/components/Toast";
 import { useState, useEffect } from "react";
 
@@ -31,12 +31,6 @@ export default function HomePage() {
   const [result, setResult] = useState<Translation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [similarTranslations, setSimilarTranslations] = useState<SimilarTranslation[]>([]);
-  const [showSimilarModal, setShowSimilarModal] = useState(false);
-  const [pendingTranslation, setPendingTranslation] = useState<{
-    koreanText: string;
-    model: string;
-    style: string;
-  } | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const [settings, setSettings] = useState<Settings>({
     default_model: "gemini-flash-lite",
@@ -82,34 +76,30 @@ export default function HomePage() {
       return;
     }
 
-    setIsLoading(true);
+    // Clear suggestions from a previous translation, then surface similar past
+    // translations in the background — this never blocks the new translation.
+    setSimilarTranslations([]);
+    void fetchSimilar(koreanText);
 
+    // Translate right away.
+    await executeTranslation(koreanText, model, style);
+  };
+
+  const fetchSimilar = async (koreanText: string) => {
     try {
-      // Check for similar translations first
-      const similarRes = await fetch("/api/similar", {
+      const res = await fetch("/api/similar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: koreanText }),
       });
-
-      if (similarRes.ok) {
-        const data = await similarRes.json() as { similar?: SimilarTranslation[] };
-        const { similar } = data;
-        if (similar && similar.length > 0) {
-          setSimilarTranslations(similar);
-          setPendingTranslation({ koreanText, model, style });
-          setShowSimilarModal(true);
-          setIsLoading(false);
-          return;
-        }
+      if (!res.ok) return;
+      const data = await res.json() as { similar?: SimilarTranslation[] };
+      if (data.similar && data.similar.length > 0) {
+        setSimilarTranslations(data.similar);
       }
-
-      // No similar translations, proceed with new translation
-      await executeTranslation(koreanText, model, style);
     } catch (error) {
-      console.error("Translation error:", error);
-      showToast("번역 중 오류가 발생했습니다", "error");
-      setIsLoading(false);
+      console.error("Similar search error:", error);
+      // Non-blocking: a failure just means no suggestions are shown.
     }
   };
 
@@ -147,26 +137,10 @@ export default function HomePage() {
       ...translation,
       is_favorite: Boolean(translation.is_favorite),
     });
-    setShowSimilarModal(false);
-    setSimilarTranslations([]);
-    setPendingTranslation(null);
     if (settings.auto_copy) {
       void autoCopy(translation.english_text);
     } else {
       showToast("기존 번역을 사용했습니다", "success");
-    }
-  };
-
-  const handleTranslateNew = async () => {
-    setShowSimilarModal(false);
-    setSimilarTranslations([]);
-    if (pendingTranslation) {
-      await executeTranslation(
-        pendingTranslation.koreanText,
-        pendingTranslation.model,
-        pendingTranslation.style
-      );
-      setPendingTranslation(null);
     }
   };
 
@@ -212,16 +186,10 @@ export default function HomePage() {
         />
       )}
 
-      {showSimilarModal && (
-        <SimilarModal
+      {result && (
+        <SimilarSuggestions
           translations={similarTranslations}
           onUseSimilar={handleUseSimilar}
-          onTranslateNew={handleTranslateNew}
-          onClose={() => {
-            setShowSimilarModal(false);
-            setSimilarTranslations([]);
-            setPendingTranslation(null);
-          }}
         />
       )}
 

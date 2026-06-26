@@ -38,6 +38,36 @@ function mockFetch(autoCopy: number) {
   });
 }
 
+const SIMILAR = {
+  id: "s1",
+  korean_text: "이 코드 봐줄 수 있어?",
+  english_text: "Can you take a look at this code?",
+  model: "gemini-flash-lite",
+  style: "casual-work",
+  category: null,
+  is_favorite: false,
+  created_at: "2026-01-01T00:00:00.000Z",
+  similarity: 0.9,
+};
+
+// Like mockFetch but /api/similar returns a match, to exercise the W6 suggestion.
+function mockFetchSimilar() {
+  return vi.fn(async (url: string) => {
+    if (url === "/api/settings") {
+      return jsonResponse({
+        settings: {
+          default_model: "gemini-flash-lite",
+          default_style: "casual-work",
+          auto_copy: 0,
+        },
+      });
+    }
+    if (url === "/api/similar") return jsonResponse({ similar: [SIMILAR] });
+    if (url === "/api/translate") return jsonResponse(TRANSLATION);
+    throw new Error(`unexpected fetch: ${url}`);
+  });
+}
+
 const writeText = vi.fn().mockResolvedValue(undefined);
 
 afterEach(() => {
@@ -82,5 +112,48 @@ describe("HomePage auto-copy (B1 + W8)", () => {
     // Result is rendered, but the clipboard was never written to.
     await screen.findByText("Could you take a look?");
     expect(writeText).not.toHaveBeenCalled();
+  });
+});
+
+describe("HomePage similar suggestions (W6)", () => {
+  async function setup() {
+    const user = userEvent.setup();
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    render(<HomePage />);
+    await waitFor(() =>
+      expect(globalThis.fetch).toHaveBeenCalledWith("/api/settings")
+    );
+    await user.type(screen.getByPlaceholderText(/번역할 텍스트/), "이 코드 봐줄래");
+    await user.keyboard("{Enter}");
+    return user;
+  }
+
+  it("translates immediately and offers similar past translations (no blocking modal)", async () => {
+    vi.stubGlobal("fetch", mockFetchSimilar());
+
+    await setup();
+
+    // Fresh translation appears right away...
+    await screen.findByText("Could you take a look?");
+    // ...and the similar past translation is surfaced as a non-blocking suggestion.
+    await screen.findByText("Can you take a look at this code?");
+    await screen.findByText("이걸로 교체");
+  });
+
+  it("reuses a similar translation when '이걸로 교체' is clicked", async () => {
+    vi.stubGlobal("fetch", mockFetchSimilar());
+
+    const user = await setup();
+    await screen.findByText("Could you take a look?");
+
+    await user.click(await screen.findByText("이걸로 교체"));
+
+    // The result is replaced by the reused translation — the fresh result text is gone.
+    await waitFor(() =>
+      expect(screen.queryByText("Could you take a look?")).toBeNull()
+    );
   });
 });
