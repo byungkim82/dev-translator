@@ -5,6 +5,7 @@
 >
 > **마지막 업데이트:** 2026-06-25
 > **사용법:** 항목을 진행할 때 상태를 갱신하고, 커밋 메시지/대화에서 `Q1`, `W6` 같은 ID로 참조하세요. 완료 항목은 아래 [완료 로그](#완료-로그)로 옮깁니다.
+> **작업 규칙:** 모든 개선은 가능한 한 **테스트 커버리지와 함께** 진행합니다 (Vitest 기반 = T18). 순수 로직 → 유닛 테스트, UI → 컴포넌트 테스트, API 라우트 → Workers 풀, 외부 API → `fetch` 모킹.
 
 ---
 
@@ -22,7 +23,7 @@
 
 | ID | 항목 | 분류 | 우선 | 작업량 | 상태 |
 |----|------|------|:---:|:---:|:---:|
-| B1 | `auto_copy` 설정이 동작하지 않음 | Bug | 🔴 | S | 🔲 |
+| B1 | `auto_copy` 설정이 동작하지 않음 | Bug | 🔴 | S | ✅ |
 | B2 | DB에 잘못된 모델명 저장 | Bug | 🟡 | S | ✅ |
 | Q1 | 용어집(Glossary) / 고정 번역 사전 | 품질 | 🔴 | M | 🔲 |
 | Q2 | 코드/영어 혼용 입력 보존 | 품질 | 🔴 | S | 🔲 |
@@ -31,7 +32,7 @@
 | Q5 | 대안 2~3개 동시 제시 | 품질 | 🟢 | M | 🔲 |
 | W6 | 유사 검색 논블로킹/병렬화 | 워크플로우 | 🔴 | M | 🔲 |
 | W7 | 스트리밍 출력 | 워크플로우 | 🔴 | M | 🔲 |
-| W8 | 자동 복사 + 토스트 (B1 연계) | 워크플로우 | 🔴 | S | 🔲 |
+| W8 | 자동 복사 + 토스트 (B1 연계) | 워크플로우 | 🔴 | S | ✅ |
 | W9 | 정확 일치 캐시 | 워크플로우 | 🟡 | S | 🔲 |
 | W10 | 브라우저 확장 / 전역 단축키 | 워크플로우 | 🟢 | L | 🔲 |
 | F11 | 영어 → 한국어 (읽기 모드) | 기능 | 🔴 | M | 🔲 |
@@ -47,9 +48,8 @@
 
 ## 🐞 버그 (Bugs)
 
-### B1 · `auto_copy` 설정이 동작하지 않음 — 🔴 S
-`settings`에 `auto_copy`가 로드되지만(`app/page.tsx:41-45`) 번역 완료 흐름 `executeTranslation`(`app/page.tsx:105-128`)에서 전혀 사용되지 않음. 자동 복사 설정이 죽어 있음.
-**고치기:** 번역 성공 시 `settings.auto_copy`가 켜져 있으면 `navigator.clipboard.writeText` 호출. → W8과 함께 처리.
+### B1 · `auto_copy` 설정이 동작하지 않음 — 🔴 S — ✅
+`settings`에 `auto_copy`가 로드되지만(`app/page.tsx:41-45`) 번역 완료 흐름 `executeTranslation`에서 전혀 사용되지 않아 자동 복사 설정이 죽어 있던 문제. **W8과 함께 수정 완료** — 상세는 W8 참고.
 
 ### B2 · DB에 잘못된 모델명 저장 — 🟡 S
 `app/api/translate/route.ts:63`에서 `model || "gemini-flash"`로 저장하지만 실제 기본 키는 `"gemini-flash-lite"`. 기본 모델로 번역 시 DB에 존재하지 않는 `gemini-flash`가 기록됨(통계/필터 왜곡 가능).
@@ -91,9 +91,11 @@
 Gemini를 `streamGenerateContent`로 바꿔 토큰 단위 출력 → 체감 속도 대폭 향상. 현재는 완료까지 빈 화면 대기(`lib/ai/gemini.ts`는 `generateContent` 사용).
 **관련 코드:** `lib/ai/gemini.ts`, `app/api/translate/route.ts`(스트림 응답), 결과 컴포넌트.
 
-### W8 · 자동 복사 + 토스트 — 🔴 S
+### W8 · 자동 복사 + 토스트 — 🔴 S — ✅
 B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣기만 하면 되게.
-**관련 코드:** `app/page.tsx`(`executeTranslation`).
+**완료 범위:** `app/page.tsx`에 `autoCopy()` 헬퍼 추가 → `executeTranslation` 성공 시와 `handleUseSimilar`(기존 번역 재사용) 시 `settings.auto_copy`가 켜져 있으면 결과를 클립보드에 자동 복사 + "자동 복사됨" 토스트, 실패 시 안내 토스트로 폴백.
+**테스트:** `app/page.test.tsx` 컴포넌트 테스트(jsdom + React Testing Library, `fetch`/clipboard 모킹) — auto_copy ON이면 클립보드 호출·OFF면 미호출 검증. 이 작업으로 **컴포넌트 테스트 환경도 함께 구축**됨(`@vitejs/plugin-react`, jsdom, RTL).
+**알려진 제약:** `navigator.clipboard.writeText`는 비동기 fetch 이후 호출돼 일부 브라우저(특히 Safari)에서 사용자 제스처 밖이라 차단될 수 있음 → 그 경우 폴백 토스트가 뜨고 수동 복사 버튼으로 처리.
 
 ### W9 · 정확 일치 캐시 — 🟡 S
 동일 한국어 + 스타일 입력은 DB에서 즉시 반환(API 호출·임베딩 비용 0). 번역 전에 정확 일치 조회.
@@ -173,3 +175,4 @@ B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣
 |----|------|--------|------|
 | B2 | DB에 잘못된 모델명 저장 → `resolvedModel`로 통일 | 2026-06-25 | `ab3a32f` |
 | T18 | 테스트 기반 구축 (Vitest + 유닛 테스트 32개) | 2026-06-25 | `7de1f61` |
+| B1+W8 | 자동 복사 작동 (`auto_copy` 연결 + 토스트, 컴포넌트 테스트 환경 구축) | 2026-06-25 | `2e42570` |
