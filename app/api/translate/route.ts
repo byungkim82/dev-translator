@@ -5,6 +5,8 @@ import { getEmbedding } from "@/lib/ai/embedding";
 import { buildTranslationPrompt, type UserContext } from "@/lib/prompts";
 import { generateId, estimateTokens } from "@/lib/utils";
 import { findCachedTranslation, normalizeKoreanInput } from "@/lib/cache";
+import { selectFewShotExamples, type FewShotExample } from "@/lib/examples";
+import type { TranslationWithEmbedding } from "@/lib/similarity";
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,20 +71,36 @@ export async function POST(request: NextRequest) {
     ).first<UserContext & { glossary?: string }>();
     const userContext: UserContext = settingsRow || {};
 
-    // Build prompt and translate
-    const prompt = buildTranslationPrompt(koreanText, resolvedStyle, userContext, settingsRow?.glossary);
-    const englishText = await callGemini(prompt, cfEnv.GEMINI_API_KEY, resolvedModel, resolvedStyle);
-
-    // Generate embedding if OpenAI key is available
+    // P14: compute the input embedding once, up front. Used both to find similar
+    // past favorited translations (few-shot style examples) and, later, for storage.
     let embedding: number[] | null = null;
     if (cfEnv.OPENAI_API_KEY) {
       try {
         embedding = await getEmbedding(koreanText, cfEnv.OPENAI_API_KEY);
       } catch (e) {
         console.error("Embedding generation failed:", e);
-        // Continue without embedding
+        // Continue without embedding (no examples, no stored vector).
       }
     }
+
+    // P14: personalized few-shot examples from the user's own favorited history.
+    // No embedding (e.g. no OpenAI key) or no close favorites => stays empty, so
+    // the prompt falls back to the static examples unchanged (zero behavior change).
+    let examples: FewShotExample[] = [];
+    if (embedding) {
+      const favorites = await cfEnv.DB.prepare(
+        `SELECT id, korean_text, english_text, embedding, model, style, category, is_favorite, created_at
+         FROM translations
+         WHERE is_favorite = 1 AND embedding IS NOT NULL
+         ORDER BY created_at DESC
+         LIMIT 200`
+      ).all<TranslationWithEmbedding>();
+      examples = selectFewShotExamples(embedding, favorites.results ?? []);
+    }
+
+    // Build prompt and translate
+    const prompt = buildTranslationPrompt(koreanText, resolvedStyle, userContext, settingsRow?.glossary, examples);
+    const englishText = await callGemini(prompt, cfEnv.GEMINI_API_KEY, resolvedModel, resolvedStyle);
 
     // Save to database
     const id = generateId();
