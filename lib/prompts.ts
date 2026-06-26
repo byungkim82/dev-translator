@@ -1,3 +1,5 @@
+import { buildExamplesLine, type FewShotExample } from "./examples";
+
 export const STYLE_PROMPTS: Record<string, string> = {
   "casual-work": `Translate the following Korean text to natural, casual but professional English appropriate for Slack communication in a US tech company. Use friendly, conversational tone. Focus on:
 - Natural phrasing that native speakers would use
@@ -119,15 +121,17 @@ export function buildTranslationPrompt(
   koreanText: string,
   style: string,
   context: UserContext = {},
-  glossary?: string
+  glossary?: string,
+  examples: FewShotExample[] = []
 ): string {
   const template = STYLE_PROMPTS[style] || STYLE_PROMPTS["casual-work"];
   const contextLine = buildContextLine(context);
   const ruleLine = `\nRule: ${CODE_PRESERVATION_RULE}\n`;
   const glossaryLine = buildGlossaryLine(glossary);
+  const examplesLine = buildExamplesLine(examples);
   return template.replace(
     "Korean: {INPUT}",
-    `${ruleLine}${glossaryLine}${contextLine}Korean: ${koreanText}`
+    `${ruleLine}${glossaryLine}${examplesLine}${contextLine}Korean: ${koreanText}`
   );
 }
 

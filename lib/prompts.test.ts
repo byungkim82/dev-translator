@@ -77,6 +77,19 @@ describe("buildTranslationPrompt", () => {
     const prompt = buildTranslationPrompt("결제 확인해줘", "casual-work");
     expect(prompt).not.toContain("Glossary");
   });
+
+  it("injects personalized few-shot examples when provided", () => {
+    const prompt = buildTranslationPrompt("리뷰 부탁해", "casual-work", {}, undefined, [
+      { korean: "이 코드 리뷰해줄 수 있어?", english: "Mind giving this a review?" },
+    ]);
+    expect(prompt).toContain("match this voice");
+    expect(prompt).toContain("Mind giving this a review?");
+  });
+
+  it("omits the examples block when none are given", () => {
+    const prompt = buildTranslationPrompt("리뷰 부탁해", "casual-work");
+    expect(prompt).not.toContain("match this voice");
+  });
 });
 
 describe("buildGlossaryLine", () => {
