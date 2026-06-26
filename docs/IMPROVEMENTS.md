@@ -41,6 +41,7 @@
 | P15 | 인라인 편집 + 교정 학습 | 개인화 | 🟡 | M | 🔲 |
 | T16 | 유사 검색을 Cloudflare Vectorize로 이전 | 기술 | 🟡 | L | 🔲 |
 | T17 | Gemini 호출 타임아웃/재시도 | 기술 | 🟡 | S | 🔲 |
+| T18 | 테스트 기반 구축 (Vitest + 순수 함수 유닛 테스트) | 기술 | 🟡 | M | ✅ |
 
 ---
 
@@ -142,6 +143,14 @@ B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣
 현재 실패 시 그대로 에러(`lib/ai/gemini.ts`). 1회 재시도 + 타임아웃으로 안정성 확보.
 **관련 코드:** `lib/ai/gemini.ts`.
 
+### T18 · 테스트 기반 구축 (Vitest + 순수 함수 유닛 테스트) — 🟡 M — ✅
+변경이 동작을 깨뜨려도 잡아줄 자동 안전망이 없던 상태에서, Vitest 기반을 세우고 I/O 없는 순수 함수부터 커버.
+**완료 범위:**
+- Vitest 설치 + `vitest.config.ts`(node 환경, tsconfig의 `@/*` alias 미러), `npm test` / `npm run test:run` 스크립트
+- 유닛 테스트 32개 (4파일): `lib/similarity.test.ts`(코사인·임계값·정렬·잘못된 임베딩 스킵), `lib/prompts.test.ts`(맥락 주입·스타일 fallback·카테고리), `lib/utils.test.ts`(토큰 추정·UUID), `lib/ai/gemini.test.ts`(따옴표/접두사 후처리)
+- `lib/ai/gemini.ts`의 후처리 로직을 `cleanGeminiOutput()`로 추출해 API 호출 없이 테스트 가능하게 리팩터
+**향후 확장:** `@cloudflare/vitest-pool-workers`로 D1 연동 API 라우트 테스트까지 확대(별도 항목으로 분리 가능).
+
 ---
 
 ## 추천 진행 순서 (Suggested Sequencing)
@@ -163,3 +172,4 @@ B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣
 | ID | 항목 | 완료일 | 커밋 |
 |----|------|--------|------|
 | B2 | DB에 잘못된 모델명 저장 → `resolvedModel`로 통일 | 2026-06-25 | `ab3a32f` |
+| T18 | 테스트 기반 구축 (Vitest + 유닛 테스트 32개) | 2026-06-25 | `7de1f61` |
