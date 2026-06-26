@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { callGemini } from "@/lib/ai/gemini";
+import { streamGeminiText, cleanGeminiOutput } from "@/lib/ai/gemini";
 import { getEmbedding } from "@/lib/ai/embedding";
 import { buildTranslationPrompt, type UserContext } from "@/lib/prompts";
-import { generateId, estimateTokens } from "@/lib/utils";
+import { generateId } from "@/lib/utils";
 import { findCachedTranslation, normalizeKoreanInput } from "@/lib/cache";
 import { selectFewShotExamples, type FewShotExample } from "@/lib/examples";
 import type { TranslationWithEmbedding } from "@/lib/similarity";
+import { encodeStreamEvent, type StreamEvent } from "@/lib/stream-protocol";
+import { finalizeTranslation } from "@/lib/translate-core";
 
 export async function POST(request: NextRequest) {
   try {
@@ -99,43 +101,68 @@ export async function POST(request: NextRequest) {
       examples = selectFewShotExamples(embedding, favorites.results ?? []);
     }
 
-    // Build prompt and translate
+    // Build the prompt, then stream the fresh translation (W7) as NDJSON:
+    // a `meta` line, `delta` lines as Gemini emits tokens, then `done` (with the
+    // DB id) after the row is persisted. The exact-match cache hit and pre-stream
+    // errors above still return plain JSON — only this path streams.
     const prompt = buildTranslationPrompt(koreanText, resolvedStyle, userContext, settingsRow?.glossary, examples);
-    const { text: englishText, truncated } = await callGemini(prompt, cfEnv.GEMINI_API_KEY, resolvedModel, resolvedStyle);
-
-    // Save to database
     const id = generateId();
     const now = new Date().toISOString();
+    const geminiKey = cfEnv.GEMINI_API_KEY;
+    const db = cfEnv.DB;
+    const encoder = new TextEncoder();
 
-    await cfEnv.DB.prepare(
-      `INSERT INTO translations (id, korean_text, english_text, model, style, embedding, char_count, token_count, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-      .bind(
-        id,
-        koreanText,
-        englishText,
-        resolvedModel,
-        resolvedStyle,
-        embedding ? JSON.stringify(embedding) : null,
-        koreanText.length,
-        estimateTokens(koreanText),
-        now,
-        now
-      )
-      .run();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (event: StreamEvent) =>
+          controller.enqueue(encoder.encode(encodeStreamEvent(event)));
+        try {
+          send({ type: "meta", model: resolvedModel, style: resolvedStyle, korean_text: koreanText });
 
-    return NextResponse.json({
-      id,
-      korean_text: koreanText,
-      english_text: englishText,
-      model: resolvedModel,
-      style: resolvedStyle,
-      category: null,
-      is_favorite: false,
-      created_at: now,
-      cached: false,
-      truncated,
+          let full = "";
+          let truncated = false;
+          const gen = streamGeminiText(prompt, geminiKey, resolvedModel, resolvedStyle);
+          for (;;) {
+            const next = await gen.next();
+            if (next.done) {
+              truncated = next.value.truncated;
+              break;
+            }
+            full += next.value;
+            send({ type: "delta", text: next.value });
+          }
+
+          const englishText = cleanGeminiOutput(full);
+          // Persist after the full text is known, before closing the stream.
+          await finalizeTranslation(db, {
+            id,
+            koreanText,
+            englishText,
+            model: resolvedModel,
+            style: resolvedStyle,
+            embedding,
+            createdAt: now,
+          });
+
+          send({ type: "done", id, english_text: englishText, truncated, created_at: now });
+          controller.close();
+        } catch (err) {
+          // The HTTP status is already 200, so surface mid-stream failures in-band.
+          send({
+            type: "error",
+            message: err instanceof Error ? err.message : "번역 중 오류가 발생했습니다",
+          });
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        "Content-Encoding": "identity",
+      },
     });
   } catch (error) {
     console.error("Translation error:", error);
