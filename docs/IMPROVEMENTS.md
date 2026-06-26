@@ -139,7 +139,8 @@ B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣
 
 ### P14 · 내 과거 번역을 few-shot으로 재활용 — 🔴 L
 현재 프롬프트 예시는 고정·일반적(`lib/prompts.ts`). 즐겨찾기/채택 번역을 임베딩으로 검색해 프롬프트 예시로 주입 → 쓸수록 내 스타일에 수렴(교정 감소). T16/P15와 시너지.
-**관련 코드:** `lib/prompts.ts`, `lib/similarity.ts`, `app/api/translate/route.ts`.
+**📐 설계안:** [`docs/P14-personalized-examples-design.md`](./P14-personalized-examples-design.md) — 대부분 기존 인프라(임베딩·`lib/similarity.ts`·주입 자리) 재사용이라 신규 표면 최소. 콜드스타트/노키 시 정적 예시로 폴백(= no-op, 무회귀). **구현 전 미결정 5건**(예시 출처/개수 K/유사도 임계값/주입 방식/시그니처) 확정 필요.
+**관련 코드:** `lib/examples.ts`(신규: 선택/포맷), `lib/prompts.ts`(주입), `lib/similarity.ts`(재사용), `app/api/translate/route.ts`(임베딩 선계산+후보 조회).
 
 ### P15 · 인라인 편집 + 교정 학습 — 🟡 M
 결과를 복사 전 인라인 편집 가능하게 하고, 편집분을 "교정 신호"로 저장 → P14 학습 데이터로 활용.
