@@ -100,10 +100,17 @@ function buildContextLine(context: UserContext): string {
   return `\nContext: ${parts.join(" ")}.\n`;
 }
 
+// Applied to every style: keep the English tech terms / code identifiers the
+// developer already wrote, verbatim. Korean devs routinely mix these in
+// ("이 PR을 staging에 deploy 했어"), and re-translating them just creates noise.
+export const CODE_PRESERVATION_RULE =
+  "Keep any English technical terms, code identifiers, commands, file names, and product names that already appear in the Korean text exactly as written (e.g. merge, deploy, rebase, staging, PR, function/variable names). Do not translate, expand, or alter them.";
+
 export function buildTranslationPrompt(koreanText: string, style: string, context: UserContext = {}): string {
   const template = STYLE_PROMPTS[style] || STYLE_PROMPTS["casual-work"];
   const contextLine = buildContextLine(context);
-  return template.replace("Korean: {INPUT}", `${contextLine}Korean: ${koreanText}`);
+  const ruleLine = `\nRule: ${CODE_PRESERVATION_RULE}\n`;
+  return template.replace("Korean: {INPUT}", `${ruleLine}${contextLine}Korean: ${koreanText}`);
 }
 
 export const CATEGORIES = [

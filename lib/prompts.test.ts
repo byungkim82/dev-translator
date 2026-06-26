@@ -3,6 +3,7 @@ import {
   buildCategorizationPrompt,
   buildTranslationPrompt,
   CATEGORIES,
+  CODE_PRESERVATION_RULE,
 } from "./prompts";
 
 describe("buildTranslationPrompt", () => {
@@ -46,6 +47,23 @@ describe("buildTranslationPrompt", () => {
     // must not be injected into the context line.
     expect(prompt).not.toContain("at a ");
     expect(prompt).not.toContain("writing to");
+  });
+
+  it("injects the code-preservation rule for every style", () => {
+    for (const style of [
+      "casual-work",
+      "formal-work",
+      "very-casual",
+      "technical-doc",
+    ]) {
+      const prompt = buildTranslationPrompt("이 PR을 staging에 deploy 했어", style);
+      expect(prompt).toContain(CODE_PRESERVATION_RULE);
+    }
+  });
+
+  it("injects the code-preservation rule even for an unknown style (fallback)", () => {
+    const prompt = buildTranslationPrompt("rebase 부탁해", "does-not-exist");
+    expect(prompt).toContain(CODE_PRESERVATION_RULE);
   });
 });
 
