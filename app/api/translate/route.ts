@@ -9,6 +9,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as { koreanText?: string; model?: string; style?: string };
     const { koreanText, model, style } = body;
+    const resolvedModel = model || "gemini-flash-lite";
 
     if (!koreanText || typeof koreanText !== "string") {
       return NextResponse.json(
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     // Build prompt and translate
     const prompt = buildTranslationPrompt(koreanText, style || "casual-work", userContext);
-    const englishText = await callGemini(prompt, cfEnv.GEMINI_API_KEY, model || "gemini-flash-lite", style || "casual-work");
+    const englishText = await callGemini(prompt, cfEnv.GEMINI_API_KEY, resolvedModel, style || "casual-work");
 
     // Generate embedding if OpenAI key is available
     let embedding: number[] | null = null;
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
         id,
         koreanText,
         englishText,
-        model || "gemini-flash",
+        resolvedModel,
         style || "casual-work",
         embedding ? JSON.stringify(embedding) : null,
         koreanText.length,
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
       id,
       korean_text: koreanText,
       english_text: englishText,
-      model: model || "gemini-flash",
+      model: resolvedModel,
       style: style || "casual-work",
       category: null,
       is_favorite: false,
