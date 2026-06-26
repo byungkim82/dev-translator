@@ -8,6 +8,8 @@
     "build": "next build && opennextjs-cloudflare build --skipNextBuild",
     "start": "next start",
     "lint": "next lint",
+    "test": "vitest",
+    "test:run": "vitest run",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create dev-translator-db",
     "db:migrate:local": "wrangler d1 migrations apply dev-translator-db --local",
@@ -32,6 +34,7 @@
     "postcss": "^8.5.4",
     "tailwindcss": "^4.1.8",
     "typescript": "^5.8.3",
+    "vitest": "^4.1.9",
     "wrangler": "^4.20.1"
   }
 }

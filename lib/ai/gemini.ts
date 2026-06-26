@@ -66,7 +66,12 @@ export async function callGemini(
   const data = (await response.json()) as GeminiResponse;
   const raw = data.candidates[0].content.parts[0].text;
 
-  // Post-process: remove surrounding quotes and common prefixes Gemini sometimes adds
+  return cleanGeminiOutput(raw);
+}
+
+// Post-process: remove surrounding quotes and common prefixes Gemini sometimes adds.
+// Exported so the cleanup rules can be unit-tested without hitting the API.
+export function cleanGeminiOutput(raw: string): string {
   return raw
     .trim()
     .replace(/^["'`]|["'`]$/g, "")
