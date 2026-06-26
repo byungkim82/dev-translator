@@ -106,11 +106,29 @@ function buildContextLine(context: UserContext): string {
 export const CODE_PRESERVATION_RULE =
   "Keep any English technical terms, code identifiers, commands, file names, and product names that already appear in the Korean text exactly as written (e.g. merge, deploy, rebase, staging, PR, function/variable names). Do not translate, expand, or alter them.";
 
-export function buildTranslationPrompt(koreanText: string, style: string, context: UserContext = {}): string {
+// User-maintained free-text glossary / terminology preferences, appended to the
+// prompt verbatim. Empty/blank/undefined => no block, so the prompt is identical
+// to before the glossary feature existed (zero behavior change when unused).
+export function buildGlossaryLine(glossary?: string): string {
+  const trimmed = glossary?.trim();
+  if (!trimmed) return "";
+  return `\nGlossary / terminology preferences (apply when the relevant Korean appears; the English may be inflected or pluralized to read naturally):\n${trimmed}\n`;
+}
+
+export function buildTranslationPrompt(
+  koreanText: string,
+  style: string,
+  context: UserContext = {},
+  glossary?: string
+): string {
   const template = STYLE_PROMPTS[style] || STYLE_PROMPTS["casual-work"];
   const contextLine = buildContextLine(context);
   const ruleLine = `\nRule: ${CODE_PRESERVATION_RULE}\n`;
-  return template.replace("Korean: {INPUT}", `${ruleLine}${contextLine}Korean: ${koreanText}`);
+  const glossaryLine = buildGlossaryLine(glossary);
+  return template.replace(
+    "Korean: {INPUT}",
+    `${ruleLine}${glossaryLine}${contextLine}Korean: ${koreanText}`
+  );
 }
 
 export const CATEGORIES = [

@@ -63,14 +63,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Load user context from settings
+    // Load user context + glossary from settings
     const settingsRow = await cfEnv.DB.prepare(
-      "SELECT user_role, company_size, audience FROM settings WHERE id = 'default'"
-    ).first<UserContext>();
+      "SELECT user_role, company_size, audience, glossary FROM settings WHERE id = 'default'"
+    ).first<UserContext & { glossary?: string }>();
     const userContext: UserContext = settingsRow || {};
 
     // Build prompt and translate
-    const prompt = buildTranslationPrompt(koreanText, resolvedStyle, userContext);
+    const prompt = buildTranslationPrompt(koreanText, resolvedStyle, userContext, settingsRow?.glossary);
     const englishText = await callGemini(prompt, cfEnv.GEMINI_API_KEY, resolvedModel, resolvedStyle);
 
     // Generate embedding if OpenAI key is available

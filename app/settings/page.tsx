@@ -10,6 +10,7 @@ interface Settings {
   user_role: string;
   company_size: string;
   audience: string;
+  glossary: string;
 }
 
 interface Stats {
@@ -27,6 +28,7 @@ export default function SettingsPage() {
     user_role: "",
     company_size: "",
     audience: "",
+    glossary: "",
   });
   const [stats, setStats] = useState<Stats>({
     total: 0,
@@ -221,6 +223,28 @@ export default function SettingsPage() {
             {isSaving ? "저장 중..." : "설정 저장"}
           </button>
         </div>
+      </section>
+
+      {/* Glossary / terminology */}
+      <section className="bg-white rounded-lg p-6 shadow-sm">
+        <h2 className="text-lg font-semibold mb-1">용어 / 번역 지침</h2>
+        <p className="text-sm text-gray-500 mb-4">자주 쓰는 용어의 번역 규칙을 자유롭게 적어두면 모든 번역에 반영됩니다. 비워두면 사용하지 않습니다.</p>
+
+        <textarea
+          value={settings.glossary}
+          onChange={(e) => setSettings({ ...settings, glossary: e.target.value })}
+          placeholder={"예:\n결제 → payments\n정산 → settlement\n토스페이는 TossPay로 그대로 두기"}
+          rows={5}
+          className="w-full p-3 border border-gray-200 rounded-md resize-y focus:outline-none focus:border-primary text-sm"
+        />
+
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="w-full mt-4 py-3 bg-gradient-primary text-white rounded-md hover:opacity-90 shadow-md disabled:opacity-50 transition-all"
+        >
+          {isSaving ? "저장 중..." : "설정 저장"}
+        </button>
       </section>
 
       {/* Statistics */}

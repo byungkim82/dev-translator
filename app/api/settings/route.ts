@@ -9,6 +9,7 @@ interface Settings {
   user_role: string;
   company_size: string;
   audience: string;
+  glossary: string;
 }
 
 interface Stats {
@@ -64,6 +65,7 @@ export async function GET() {
         user_role: "",
         company_size: "",
         audience: "",
+        glossary: "",
       },
       stats,
     });
@@ -81,14 +83,14 @@ export async function PUT(request: NextRequest) {
     const { env } = await getCloudflareContext();
     const cfEnv = env as CloudflareEnv;
 
-    const body = await request.json() as { default_model?: string; default_style?: string; auto_copy?: boolean | number; user_role?: string; company_size?: string; audience?: string };
-    const { default_model, default_style, auto_copy, user_role, company_size, audience } = body;
+    const body = await request.json() as { default_model?: string; default_style?: string; auto_copy?: boolean | number; user_role?: string; company_size?: string; audience?: string; glossary?: string };
+    const { default_model, default_style, auto_copy, user_role, company_size, audience, glossary } = body;
 
     const now = new Date().toISOString();
 
     await cfEnv.DB.prepare(
-      `INSERT INTO settings (id, default_model, default_style, auto_copy, user_role, company_size, audience, updated_at)
-       VALUES ('default', ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO settings (id, default_model, default_style, auto_copy, user_role, company_size, audience, glossary, updated_at)
+       VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          default_model = excluded.default_model,
          default_style = excluded.default_style,
@@ -96,6 +98,7 @@ export async function PUT(request: NextRequest) {
          user_role = excluded.user_role,
          company_size = excluded.company_size,
          audience = excluded.audience,
+         glossary = excluded.glossary,
          updated_at = excluded.updated_at`
     )
       .bind(
@@ -105,6 +108,7 @@ export async function PUT(request: NextRequest) {
         user_role || "",
         company_size || "",
         audience || "",
+        glossary || "",
         now
       )
       .run();

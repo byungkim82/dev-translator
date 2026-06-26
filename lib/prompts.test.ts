@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCategorizationPrompt,
+  buildGlossaryLine,
   buildTranslationPrompt,
   CATEGORIES,
   CODE_PRESERVATION_RULE,
@@ -64,6 +65,31 @@ describe("buildTranslationPrompt", () => {
   it("injects the code-preservation rule even for an unknown style (fallback)", () => {
     const prompt = buildTranslationPrompt("rebase 부탁해", "does-not-exist");
     expect(prompt).toContain(CODE_PRESERVATION_RULE);
+  });
+
+  it("injects the glossary block when glossary text is provided", () => {
+    const prompt = buildTranslationPrompt("결제 확인해줘", "casual-work", {}, "결제 → payments");
+    expect(prompt).toContain("결제 → payments");
+    expect(prompt).toContain("Glossary");
+  });
+
+  it("omits the glossary block when no glossary is given", () => {
+    const prompt = buildTranslationPrompt("결제 확인해줘", "casual-work");
+    expect(prompt).not.toContain("Glossary");
+  });
+});
+
+describe("buildGlossaryLine", () => {
+  it("returns an empty string for undefined / blank glossary (no-op)", () => {
+    expect(buildGlossaryLine(undefined)).toBe("");
+    expect(buildGlossaryLine("")).toBe("");
+    expect(buildGlossaryLine("   \n\t ")).toBe("");
+  });
+
+  it("wraps non-empty glossary text in a labeled block", () => {
+    const line = buildGlossaryLine("결제 → payments");
+    expect(line).toContain("결제 → payments");
+    expect(line).toContain("Glossary");
   });
 });
 
