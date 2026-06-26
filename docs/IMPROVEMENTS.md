@@ -32,7 +32,7 @@
 | Q5 | 대안 2~3개 동시 제시 | 품질 | 🟢 | M | 🔲 |
 | Q6 | 출력 길이 상한 8192 + 잘림 감지 경고 | 품질 | 🟡 | S | ✅ |
 | W6 | 유사 검색 논블로킹/병렬화 | 워크플로우 | 🔴 | M | ✅ |
-| W7 | 스트리밍 출력 | 워크플로우 | 🔴 | M | 🚧 |
+| W7 | 스트리밍 출력 | 워크플로우 | 🔴 | M | ✅ |
 | W8 | 자동 복사 + 토스트 (B1 연계) | 워크플로우 | 🔴 | S | ✅ |
 | W9 | 정확 일치 캐시 | 워크플로우 | 🟡 | S | ✅ |
 | W10 | 브라우저 확장 / 전역 단축키 | 워크플로우 | 🟢 | L | 🔲 |
@@ -104,7 +104,12 @@
 Gemini를 `streamGenerateContent`로 바꿔 토큰 단위 출력 → 체감 속도 대폭 향상. 현재는 완료까지 빈 화면 대기(`lib/ai/gemini.ts`는 `generateContent` 사용).
 **📐 설계안:** [`docs/W7-streaming-design.md`](./W7-streaming-design.md) — 리서치 검증(OpenNext 스트리밍 **지원**, 단 점진 전달은 배포로만 확인). NDJSON 프로토콜·분할청크 SSE 파서·라우트/클라 패턴·**전체 테스트 매트릭스**(SSE 파서~클라 점진 렌더까지 자동, OpenNext/실 Gemini만 수동) 포함. **0단계 스파이크(배포 `curl -N`) 통과가 구현 전제.** **미결정 5건**(엔드포인트 전략 등).
 **관련 코드:** `lib/ai/sse.ts`·`lib/stream-protocol.ts`(신규), `lib/ai/gemini.ts`(`streamGeminiText`), `lib/translate-core.ts`(신규: prepare/finalize), `app/api/translate/route.ts`, `app/page.tsx`·`components/TranslationResult.tsx`.
-**진행 상황:** 🚧 미결정 5건 추천대로 확정. **0단계 스파이크 ✅ — 프로덕션 배포에서 점진 전달 실측 확인**(언더스코어 폴더 404 이슈도 해결). **1단계 완료**(`25cf22c`): `lib/ai/sse.ts`(분할청크 SSE 파서+`extractDelta`) + `lib/stream-protocol.ts`(NDJSON 인코드/디코드+`applyStreamEvent` 리듀서) + 유닛 19개. 스파이크 라우트 삭제. **남은: 2단계(`streamGeminiText`+`translate-core` 헬퍼+라우트 스트리밍), 3단계(클라+컴포넌트 테스트), 4단계(수동 검증).**
+**진행 상황:** ✅ **코드 완료** (미결정 5건 추천대로 확정).
+- **0단계 스파이크 ✅** — 프로덕션 배포에서 점진 전달 실측 확인(언더스코어 폴더 404 이슈도 해결).
+- **1단계**(`25cf22c`): `lib/ai/sse.ts`(분할청크 SSE 파서+`extractDelta`) + `lib/stream-protocol.ts`(NDJSON 인코드/디코드+`applyStreamEvent`) + 유닛 19개. 스파이크 라우트 삭제.
+- **2단계**(`732fabf`): `streamGeminiText`(주입 fetch로 단위 테스트) + `finalizeTranslation`(주입 DB로 테스트) + 라우트 fresh 분기를 NDJSON 스트림으로. 캐시/에러는 JSON 무수정. *과설계 지양: `prepareTranslation`은 재사용처 없어 미추출.*
+- **3단계**(`4508678`): `page.tsx`가 content-type 분기로 NDJSON 점진 소비, `TranslationResult` 커서+`done` 전 즐겨찾기 비활성, `AbortController` 취소. 컴포넌트 테스트(점진 렌더·자동복사·잘림·인밴드 에러) + 기존 JSON 경로 테스트. **`npm run build` 통과.**
+- **4단계(남음): 배포 후 수동 E2E 검증** — 실제 Gemini 스트리밍/긴 출력/잘림/에러를 눈으로 확인. (스파이크로 메커니즘은 이미 검증됨.)
 
 ### W8 · 자동 복사 + 토스트 — 🔴 S — ✅
 B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣기만 하면 되게.
@@ -210,3 +215,4 @@ B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣
 | P14 | 내 즐겨찾기 번역을 few-shot 예시로 재활용 (PR1+PR2) | 2026-06-25 | `ed54b49`, `7e52f3e` |
 | W6 | 유사 검색 논블로킹 (모달 → 결과 아래 제안 카드) | 2026-06-26 | `7a9114a` |
 | Q6 | 출력 상한 8192 + 잘림 감지 경고 | 2026-06-26 | `2f51fd8` |
+| W7 | 번역 결과 스트리밍 (NDJSON, 4단계) — 배포 후 E2E 수동 검증 권장 | 2026-06-26 | `25cf22c`·`732fabf`·`4508678` |
