@@ -4,14 +4,25 @@ import { callGemini } from "@/lib/ai/gemini";
 import { getEmbedding } from "@/lib/ai/embedding";
 import { buildTranslationPrompt, type UserContext } from "@/lib/prompts";
 import { generateId, estimateTokens } from "@/lib/utils";
+import { findCachedTranslation, normalizeKoreanInput } from "@/lib/cache";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as { koreanText?: string; model?: string; style?: string };
-    const { koreanText, model, style } = body;
+    const { koreanText: rawKoreanText, model, style } = body;
     const resolvedModel = model || "gemini-flash-lite";
+    const resolvedStyle = style || "casual-work";
 
-    if (!koreanText || typeof koreanText !== "string") {
+    if (!rawKoreanText || typeof rawKoreanText !== "string") {
+      return NextResponse.json(
+        { error: "번역할 텍스트가 필요합니다" },
+        { status: 400 }
+      );
+    }
+
+    // Normalize once (trim) so trivially-different whitespace still hits the cache.
+    const koreanText = normalizeKoreanInput(rawKoreanText);
+    if (!koreanText) {
       return NextResponse.json(
         { error: "번역할 텍스트가 필요합니다" },
         { status: 400 }
@@ -20,6 +31,30 @@ export async function POST(request: NextRequest) {
 
     const { env } = await getCloudflareContext();
     const cfEnv = env as CloudflareEnv;
+
+    // W9: exact-match cache. An identical (text, style, model) returns the stored
+    // translation instantly — no Gemini/embedding call, no duplicate row. model
+    // and style are part of the key, so re-requesting the same Korean with a
+    // better model (or a different style) still translates fresh.
+    const cached = await findCachedTranslation(
+      cfEnv.DB,
+      koreanText,
+      resolvedStyle,
+      resolvedModel
+    );
+    if (cached) {
+      return NextResponse.json({
+        id: cached.id,
+        korean_text: cached.korean_text,
+        english_text: cached.english_text,
+        model: cached.model,
+        style: cached.style,
+        category: cached.category,
+        is_favorite: Boolean(cached.is_favorite),
+        created_at: cached.created_at,
+        cached: true,
+      });
+    }
 
     if (!cfEnv.GEMINI_API_KEY) {
       return NextResponse.json(
@@ -35,8 +70,8 @@ export async function POST(request: NextRequest) {
     const userContext: UserContext = settingsRow || {};
 
     // Build prompt and translate
-    const prompt = buildTranslationPrompt(koreanText, style || "casual-work", userContext);
-    const englishText = await callGemini(prompt, cfEnv.GEMINI_API_KEY, resolvedModel, style || "casual-work");
+    const prompt = buildTranslationPrompt(koreanText, resolvedStyle, userContext);
+    const englishText = await callGemini(prompt, cfEnv.GEMINI_API_KEY, resolvedModel, resolvedStyle);
 
     // Generate embedding if OpenAI key is available
     let embedding: number[] | null = null;
@@ -62,7 +97,7 @@ export async function POST(request: NextRequest) {
         koreanText,
         englishText,
         resolvedModel,
-        style || "casual-work",
+        resolvedStyle,
         embedding ? JSON.stringify(embedding) : null,
         koreanText.length,
         estimateTokens(koreanText),
@@ -76,10 +111,11 @@ export async function POST(request: NextRequest) {
       korean_text: koreanText,
       english_text: englishText,
       model: resolvedModel,
-      style: style || "casual-work",
+      style: resolvedStyle,
       category: null,
       is_favorite: false,
       created_at: now,
+      cached: false,
     });
   } catch (error) {
     console.error("Translation error:", error);
