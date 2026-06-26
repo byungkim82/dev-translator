@@ -4,7 +4,13 @@ import { TranslateForm } from "@/components/TranslateForm";
 import { TranslationResult } from "@/components/TranslationResult";
 import { SimilarSuggestions } from "@/components/SimilarSuggestions";
 import { Toast } from "@/components/Toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import {
+  applyStreamEvent,
+  createNdjsonParser,
+  initialStreamState,
+  type StreamState,
+} from "@/lib/stream-protocol";
 
 export interface Translation {
   id: string;
@@ -31,6 +37,7 @@ interface Settings {
 export default function HomePage() {
   const [result, setResult] = useState<Translation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [similarTranslations, setSimilarTranslations] = useState<SimilarTranslation[]>([]);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const [settings, setSettings] = useState<Settings>({
@@ -38,6 +45,7 @@ export default function HomePage() {
     default_style: "casual-work",
     auto_copy: 0,
   });
+  const abortRef = useRef<AbortController | null>(null);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
     setToast({ message, type });
@@ -104,35 +112,102 @@ export default function HomePage() {
     }
   };
 
+  // Build a (possibly partial) Translation from the accumulated stream state.
+  const buildStreamResult = (
+    state: StreamState,
+    fb: { koreanText: string; model: string; style: string }
+  ): Translation => ({
+    id: state.done?.id ?? "",
+    korean_text: state.meta?.korean_text ?? fb.koreanText,
+    english_text: state.text,
+    model: state.meta?.model ?? fb.model,
+    style: state.meta?.style ?? fb.style,
+    is_favorite: false,
+    created_at: state.done?.created_at ?? "",
+    truncated: state.done?.truncated,
+  });
+
+  // Side effects shared by the streamed and cache-hit (JSON) completion paths.
+  const afterComplete = async (translation: Translation) => {
+    if (settings.auto_copy) {
+      await autoCopy(translation.english_text);
+    }
+    if (translation.truncated) {
+      showToast("⚠️ 결과가 잘렸을 수 있습니다 (출력 길이 한도 초과)", "error");
+    } else if (!settings.auto_copy) {
+      showToast("번역이 완료되었습니다", "success");
+    }
+  };
+
   const executeTranslation = async (koreanText: string, model: string, style: string) => {
+    // Cancel any in-flight translation before starting a new one.
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setIsLoading(true);
+    setIsStreaming(false);
     try {
       const res = await fetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ koreanText, model, style }),
+        signal: controller.signal,
       });
 
-      if (!res.ok) {
-        const error = await res.json() as { error?: string };
-        throw new Error(error.error || "Translation failed");
+      const contentType = res.headers.get("content-type") ?? "";
+
+      // Cache hit or a pre-stream error comes back as plain JSON.
+      if (contentType.includes("application/json")) {
+        const data = await res.json() as Translation & { error?: string };
+        if (!res.ok) throw new Error(data.error || "Translation failed");
+        setResult(data);
+        await afterComplete(data);
+        return;
       }
 
-      const translation = await res.json() as Translation;
-      setResult(translation);
-      if (settings.auto_copy) {
-        await autoCopy(translation.english_text);
+      // Fresh translation: consume the NDJSON stream and render progressively.
+      if (!res.body) throw new Error("스트리밍 응답을 읽을 수 없습니다");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      const parser = createNdjsonParser();
+      let state = initialStreamState();
+      const fb = { koreanText, model, style };
+
+      setIsStreaming(true);
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        for (const event of parser.push(decoder.decode(value, { stream: true }))) {
+          state = applyStreamEvent(state, event);
+          if (event.type === "error") {
+            throw new Error(state.error || "번역 중 오류가 발생했습니다");
+          }
+          if (event.type === "delta") {
+            setResult(buildStreamResult(state, fb));
+          }
+        }
       }
-      if (translation.truncated) {
-        showToast("⚠️ 결과가 잘렸을 수 있습니다 (출력 길이 한도 초과)", "error");
-      } else if (!settings.auto_copy) {
-        showToast("번역이 완료되었습니다", "success");
+
+      if (state.done) {
+        const final = buildStreamResult(state, fb);
+        setResult(final);
+        await afterComplete(final);
+      } else {
+        showToast("응답이 중단되었습니다", "error");
       }
     } catch (error) {
+      // A new translation aborting this one is expected — stay silent.
+      if ((error as Error)?.name === "AbortError") return;
       console.error("Translation error:", error);
       showToast(error instanceof Error ? error.message : "번역 중 오류가 발생했습니다", "error");
     } finally {
-      setIsLoading(false);
+      // Only the current request resets shared UI state (avoids an aborted
+      // previous request clobbering the new one's loading state).
+      if (abortRef.current === controller) {
+        setIsStreaming(false);
+        setIsLoading(false);
+      }
     }
   };
 
@@ -185,6 +260,7 @@ export default function HomePage() {
       {result && (
         <TranslationResult
           translation={result}
+          streaming={isStreaming}
           onCopy={handleCopy}
           onToggleFavorite={handleToggleFavorite}
         />
