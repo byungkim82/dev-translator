@@ -42,7 +42,7 @@ export async function POST() {
     const prompt = buildCategorizationPrompt(translations);
 
     // Call Gemini for categorization
-    const response = await callGemini(prompt, cfEnv.GEMINI_API_KEY);
+    const { text: response } = await callGemini(prompt, cfEnv.GEMINI_API_KEY);
 
     // Parse JSON response
     let categories: CategoryResult[];

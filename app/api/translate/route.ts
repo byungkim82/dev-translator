@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
         is_favorite: Boolean(cached.is_favorite),
         created_at: cached.created_at,
         cached: true,
+        truncated: false,
       });
     }
 
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     // Build prompt and translate
     const prompt = buildTranslationPrompt(koreanText, resolvedStyle, userContext, settingsRow?.glossary, examples);
-    const englishText = await callGemini(prompt, cfEnv.GEMINI_API_KEY, resolvedModel, resolvedStyle);
+    const { text: englishText, truncated } = await callGemini(prompt, cfEnv.GEMINI_API_KEY, resolvedModel, resolvedStyle);
 
     // Save to database
     const id = generateId();
@@ -134,6 +135,7 @@ export async function POST(request: NextRequest) {
       is_favorite: false,
       created_at: now,
       cached: false,
+      truncated,
     });
   } catch (error) {
     console.error("Translation error:", error);

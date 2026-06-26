@@ -15,6 +15,7 @@ export interface Translation {
   category?: string;
   is_favorite: boolean;
   created_at: string;
+  truncated?: boolean;
 }
 
 export interface SimilarTranslation extends Translation {
@@ -121,7 +122,10 @@ export default function HomePage() {
       setResult(translation);
       if (settings.auto_copy) {
         await autoCopy(translation.english_text);
-      } else {
+      }
+      if (translation.truncated) {
+        showToast("⚠️ 결과가 잘렸을 수 있습니다 (출력 길이 한도 초과)", "error");
+      } else if (!settings.auto_copy) {
         showToast("번역이 완료되었습니다", "success");
       }
     } catch (error) {

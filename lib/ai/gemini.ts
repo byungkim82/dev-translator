@@ -14,7 +14,19 @@ interface GeminiResponse {
         text: string;
       }>;
     };
+    finishReason?: string;
   }>;
+}
+
+export interface GeminiResult {
+  text: string;
+  // True when Gemini stopped because it hit maxOutputTokens (output may be cut off).
+  truncated: boolean;
+}
+
+// Gemini reports hitting the output-token cap with this finishReason.
+export function isTruncated(finishReason?: string): boolean {
+  return finishReason === "MAX_TOKENS";
 }
 
 const STYLE_TEMPERATURES: Record<string, number> = {
@@ -29,7 +41,7 @@ export async function callGemini(
   apiKey: string,
   model: string = "gemini-flash-lite",
   style: string = "casual-work"
-): Promise<string> {
+): Promise<GeminiResult> {
   // Map user-facing model name to API model name, with fallback
   const modelName = GEMINI_MODELS[model as GeminiModelKey] || GEMINI_MODELS["gemini-flash-lite"];
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
@@ -48,7 +60,7 @@ export async function callGemini(
       ],
       generationConfig: {
         temperature,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 8192,
       },
     }),
   });
@@ -64,9 +76,13 @@ export async function callGemini(
   }
 
   const data = (await response.json()) as GeminiResponse;
-  const raw = data.candidates[0].content.parts[0].text;
+  const candidate = data.candidates[0];
+  const raw = candidate.content.parts[0].text;
 
-  return cleanGeminiOutput(raw);
+  return {
+    text: cleanGeminiOutput(raw),
+    truncated: isTruncated(candidate.finishReason),
+  };
 }
 
 // Post-process: remove surrounding quotes and common prefixes Gemini sometimes adds.
