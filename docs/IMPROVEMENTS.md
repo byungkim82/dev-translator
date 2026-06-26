@@ -102,7 +102,8 @@
 
 ### W7 · 스트리밍 출력 — 🔴 M
 Gemini를 `streamGenerateContent`로 바꿔 토큰 단위 출력 → 체감 속도 대폭 향상. 현재는 완료까지 빈 화면 대기(`lib/ai/gemini.ts`는 `generateContent` 사용).
-**관련 코드:** `lib/ai/gemini.ts`, `app/api/translate/route.ts`(스트림 응답), 결과 컴포넌트.
+**📐 설계안:** [`docs/W7-streaming-design.md`](./W7-streaming-design.md) — 리서치 검증(OpenNext 스트리밍 **지원**, 단 점진 전달은 배포로만 확인). NDJSON 프로토콜·분할청크 SSE 파서·라우트/클라 패턴·**전체 테스트 매트릭스**(SSE 파서~클라 점진 렌더까지 자동, OpenNext/실 Gemini만 수동) 포함. **0단계 스파이크(배포 `curl -N`) 통과가 구현 전제.** **미결정 5건**(엔드포인트 전략 등).
+**관련 코드:** `lib/ai/sse.ts`·`lib/stream-protocol.ts`(신규), `lib/ai/gemini.ts`(`streamGeminiText`), `lib/translate-core.ts`(신규: prepare/finalize), `app/api/translate/route.ts`, `app/page.tsx`·`components/TranslationResult.tsx`.
 
 ### W8 · 자동 복사 + 토스트 — 🔴 S — ✅
 B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣기만 하면 되게.
