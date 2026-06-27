@@ -167,7 +167,7 @@ B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣
 입력하는 동안(디바운스) 즐겨찾기 코퍼스에서 비슷한 과거 번역을 찾아 보여주고, 강한 매치는 **옵트인으로 few-shot 주입**. 번역은 임베딩에 안 막힘, 임베딩은 백그라운드 기록. 전문 번역 도구의 **Translation Memory** 패턴 + LLM few-shot + 엣지 임베딩. **P14(항상 발동) 대체 · W6 흡수 · T16 동기 대체**.
 **📐 설계안:** [`docs/TM-as-you-type-design.md`](./TM-as-you-type-design.md) — 리서치 기반. 핵심 판정: **bge-m3(Workers AI 엣지)가 한국어에서 OpenAI보다 우수+저렴**(MIRACL-Ko 69.9 vs 63.9), 타이핑-중은 멈춤-디바운스(~500ms), 단일사용자라 프라이버시 무이슈(OpenAI 제거가 이득). 단계: **P1**(bge-m3 전환+임베딩 핫패스 분리=지연 해결) → **P2**(as-you-type 패널) → **P3**(선택: 인-브라우저). **미결정 5건**(전환/시작점/P14 처리 등).
 **관련 코드:** `wrangler.toml`(`[ai]`), `lib/ai/embedding-edge.ts`·`app/api/tm/route.ts`(신규), `app/api/translate/route.ts`·`app/api/similar/route.ts`, `components/TranslateForm.tsx`, `migrations/0005_*`.
-**진행 상황:** 🚧 **Phase 1a 완료(스팟체크)** — `[ai]` 바인딩·`env.AI`·`lib/ai/embedding-edge.ts`(+테스트) 추가, 임시 라우트로 한국어 품질·지연 실측 후 삭제. **확정: 모델 `bge-m3`(1024), 임계값 ~0.68, qwen3/OpenAI 드롭** (근거·수치·다음 단계는 [`docs/TM-as-you-type-design.md`](./TM-as-you-type-design.md) §8–9). **다음 = Phase 1 본작업**(마이그레이션 0005 + 임베딩 핫패스 분리 + 백필) — 새 세션에서 시작.
+**진행 상황:** 🚧 **Phase 1a 완료(스팟체크)** — `[ai]` 바인딩·`env.AI`·`lib/ai/embedding-edge.ts`(+테스트) 추가, 임시 라우트로 한국어 품질·지연 실측 후 삭제. **확정: 모델 `bge-m3`(1024), 임계값 ~0.68, qwen3/OpenAI 드롭** (근거·수치·다음 단계·단계별 계획 완성도는 [`docs/TM-as-you-type-design.md`](./TM-as-you-type-design.md) §8–10). **다음 = Phase 1 본작업**(마이그레이션 0005 + 임베딩 핫패스 분리 + 백필) — 새 세션에서 시작.
 
 ---
 
