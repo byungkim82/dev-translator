@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildExamplesLine,
   selectFewShotExamples,
+  EXAMPLE_SIMILARITY_THRESHOLD,
   type FewShotExample,
 } from "./examples";
 import type { TranslationWithEmbedding } from "./similarity";
@@ -25,6 +26,12 @@ function makeT(
     created_at: "2026-01-01T00:00:00.000Z",
   };
 }
+
+describe("EXAMPLE_SIMILARITY_THRESHOLD", () => {
+  it("uses the recalibrated bge-m3 cut-off (0.68), not the old OpenAI 0.75", () => {
+    expect(EXAMPLE_SIMILARITY_THRESHOLD).toBe(0.68);
+  });
+});
 
 describe("selectFewShotExamples", () => {
   const query = [1, 0];

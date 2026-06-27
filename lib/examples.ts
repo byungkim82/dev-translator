@@ -3,15 +3,18 @@
 // the existing embedding/similarity machinery (lib/similarity.ts) — no new tables.
 
 import { findSimilarTranslations, type TranslationWithEmbedding } from "./similarity";
+import { EDGE_SIMILARITY_THRESHOLD } from "./ai/embedding-edge";
 
 export interface FewShotExample {
   korean: string;
   english: string;
 }
 
-// Separate from the 0.85 "offer to reuse" modal threshold — lower, so relevant
-// examples surface more often as style references (decision ③).
-export const EXAMPLE_SIMILARITY_THRESHOLD = 0.75;
+// P16 §8 recalibration: examples select on the same bge-m3 cut-off as TM/similar
+// (0.68). The old 0.75/0.85 thresholds were tuned for OpenAI and too high for
+// bge-m3 — real paraphrases barely matched. Single source of truth in
+// embedding-edge so the model and its threshold stay together.
+export const EXAMPLE_SIMILARITY_THRESHOLD = EDGE_SIMILARITY_THRESHOLD;
 export const EXAMPLE_LIMIT = 3;
 
 // Pick the most similar PAST favorited translations (decision ①: favorited only)

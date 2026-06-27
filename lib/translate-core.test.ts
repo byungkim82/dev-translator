@@ -1,5 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { finalizeTranslation, type InsertDB, type NewTranslationRow } from "./translate-core";
+import {
+  finalizeTranslation,
+  recordEdgeEmbedding,
+  type InsertDB,
+  type NewTranslationRow,
+} from "./translate-core";
+import {
+  EDGE_EMBEDDING_MODEL,
+  EDGE_EMBEDDING_VERSION,
+  type EmbeddingAI,
+} from "./ai/embedding-edge";
 
 function makeDb() {
   const run = vi.fn(async () => ({}));
@@ -55,5 +65,24 @@ describe("finalizeTranslation", () => {
       "2026-01-01T00:00:00.000Z",
       "2026-01-01T00:00:00.000Z"
     );
+  });
+});
+
+describe("recordEdgeEmbedding", () => {
+  it("embeds the text with bge-m3 and updates the row's vector + version", async () => {
+    const { db, prepare, bind, run } = makeDb();
+    const aiRun = vi.fn(async () => ({ data: [[0.4, 0.5, 0.6]] }));
+    const ai = { run: aiRun } as unknown as EmbeddingAI;
+
+    await recordEdgeEmbedding(db, ai, { id: "t9", text: "배포 끝났어" });
+
+    expect(aiRun).toHaveBeenCalledWith(EDGE_EMBEDDING_MODEL, { text: "배포 끝났어" });
+    expect(prepare).toHaveBeenCalledWith(expect.stringContaining("UPDATE translations"));
+    expect(bind).toHaveBeenCalledWith(
+      JSON.stringify([0.4, 0.5, 0.6]),
+      EDGE_EMBEDDING_VERSION,
+      "t9"
+    );
+    expect(run).toHaveBeenCalledOnce();
   });
 });

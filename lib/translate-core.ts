@@ -3,6 +3,11 @@
 // DB, the same dependency-injection approach as lib/cache.ts.
 
 import { estimateTokens } from "./utils";
+import {
+  getEdgeEmbedding,
+  EDGE_EMBEDDING_VERSION,
+  type EmbeddingAI,
+} from "./ai/embedding-edge";
 
 // Minimal slice of the D1 API this helper uses.
 export interface InsertDB {
@@ -44,5 +49,32 @@ export async function finalizeTranslation(
       row.createdAt,
       row.createdAt
     )
+    .run();
+}
+
+// Minimal slice of the D1 API the background embedding update uses.
+export interface UpdateEmbeddingDB {
+  prepare(query: string): {
+    bind(...values: unknown[]): { run(): Promise<unknown> };
+  };
+}
+
+const UPDATE_EMBEDDING_SQL = `UPDATE translations
+   SET embedding_v2 = ?, embedding_version = ?
+   WHERE id = ?`;
+
+// P16 Phase 1: compute a row's bge-m3 edge embedding and store it in
+// embedding_v2 (+ version tag), OUT of the translation hot path. The route
+// schedules this via ctx.waitUntil after the stream closes, so it never blocks
+// the response — this is what removes the old ~1.3s inline-embedding stall.
+export async function recordEdgeEmbedding(
+  db: UpdateEmbeddingDB,
+  ai: EmbeddingAI,
+  row: { id: string; text: string }
+): Promise<void> {
+  const vector = await getEdgeEmbedding(ai, row.text);
+  await db
+    .prepare(UPDATE_EMBEDDING_SQL)
+    .bind(JSON.stringify(vector), EDGE_EMBEDDING_VERSION, row.id)
     .run();
 }

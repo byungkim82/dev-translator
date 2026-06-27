@@ -1,6 +1,6 @@
 # 설계안 — As-you-type 번역 메모리 (Translation Memory)
 
-> **상태:** 설계 검토 중 (구현 미착수)
+> **상태:** Phase 1 구현 완료 (핫패스 임베딩 분리) · Phase 2 상세 설계 대기
 > **작성:** 2026-06-26
 > **관련:** P14(개인화 few-shot)·W6(유사 제안)·T16(Vectorize) 를 통합/대체. 임베딩 지연(1.3s) 문제 해결.
 
@@ -106,19 +106,21 @@
 - **qwen3 드롭**(분리 미미 + 가장 느림), **OpenAI 드롭**(느림 + 제거 대상). 단일 모델.
 - 발견: 현재 코드 임계값(W6 0.85/P14 0.75)은 너무 높아 *실제 패러프레이즈도 거의 안 잡힘* → 0.68로 내려야 작동.
 
-## 9. 다음 세션 시작점 — Phase 1 체크리스트
-이미 완료(커밋됨): `[ai]` 바인딩, `env.AI` 타입, `lib/ai/embedding-edge.ts`(+테스트). 모델·임계값 확정(§8).
-**Phase 1 남은 작업** (확정 파라미터: 모델 `@cf/baai/bge-m3`, 차원 1024, 버전태그 `bgem3-1024`, 임계값 0.68):
-1. `migrations/0005_add_embedding_version.sql` — `embedding_version TEXT`, `embedding_v2 TEXT` 추가(기존 `embedding` 보존).
-2. `app/api/translate/route.ts` — 인라인 임베딩 제거 → 스트림 종료 후 백그라운드로 bge-m3 임베딩을 `embedding_v2`+버전 저장(번역 비차단). **→ 1.3s 블록 제거.**
-3. `app/api/similar/route.ts`·`lib/examples.ts` — bge-m3·`embedding_version='bgem3-1024'` 게이팅, 임계값 0.68.
-4. 기존 코퍼스 백필 스크립트(50~100행 페이지, 작아서 일회성).
-5. 테스트: 버전 게이팅·백그라운드 임베딩 경로(가짜 DB·`env.AI` 모킹).
+## 9. Phase 1 체크리스트 — ✅ 완료 (2026-06-26)
+기반(커밋됨): `[ai]` 바인딩, `env.AI` 타입, `lib/ai/embedding-edge.ts`. 모델·임계값 확정(§8).
+**Phase 1 작업** (확정 파라미터: 모델 `@cf/baai/bge-m3`, 차원 1024, 버전태그 `bgem3-1024`, 임계값 0.68):
+1. ✅ `migrations/0005_add_embedding_version.sql` — `embedding_version TEXT`, `embedding_v2 TEXT` 추가(기존 `embedding` 보존).
+2. ✅ `app/api/translate/route.ts` — 인라인 임베딩·P14 조회 제거 → `controller.close()` 후 `ctx.waitUntil(recordEdgeEmbedding(db, ai, …))`로 bge-m3 임베딩을 `embedding_v2`+버전 저장(번역 비차단, best-effort). **→ ~1.3s 블록 제거.** 핵심 로직은 `lib/translate-core.ts`의 `recordEdgeEmbedding`(주입 DB·AI로 유닛 테스트).
+3. ✅ `app/api/similar/route.ts`·`lib/examples.ts` — bge-m3 쿼리 임베딩 + `embedding_version='bgem3-1024'` 게이팅 + 임계값 0.68. 임계값 상수는 `embedding-edge.ts`(`EDGE_SIMILARITY_THRESHOLD`)에 단일 출처. similar는 `embedding_v2 AS embedding` 별칭으로 `findSimilarTranslations`/`TranslationWithEmbedding` 무수정 재사용.
+4. ✅ 백필: `lib/backfill.ts`(`backfillEmbeddingBatch` — `embedding_v2 IS NULL` 페이지 50, 행마다 `recordEdgeEmbedding` 재사용, 멱등, `{processed}` 반환) + `app/api/backfill/route.ts`(배치당 1회 POST, `{processed, remaining}` — `remaining=0`까지 반복 호출). Access 뒤라 별도 인증 불필요.
+5. ✅ 테스트: `recordEdgeEmbedding`(임베딩→UPDATE 바인딩)·`backfillEmbeddingBatch`(페이지·멱등·빈셋)·버전/임계값 상수. 가짜 DB·`env.AI` 모킹. 총 96개 통과 + `next build`·lint·tsc 통과.
+
+**배포 순서(중요):** `main` 푸시 → CI `deploy` 잡이 build → **D1 마이그레이션(0005, `wrangler d1 migrations apply --remote`) 자동 적용** → worker 배포까지 수행(수동 `db:migrate:prod` 불필요, 마이그레이션이 배포보다 먼저 실행됨). → 이후 **수동 1회성**으로 `POST /api/backfill` 반복(`remaining=0`까지, CI에 없고 라이브 AI 바인딩 필요) → 그때부터 `/api/similar` 활성. 로컬 dev만 `npm run db:migrate:local` 수동. 백필 전엔 버전 게이팅으로 유사검색이 빈 결과(의도됨: 마이그레이션 중 1536↔1024 공간 혼합 방지). P14 인라인은 Phase 2 옵트인까지 정적 예시 폴백(무회귀).
 
 ## 10. 계획 완성도 (단계별 — 명시적)
 **모든 단계가 같은 깊이로 설계된 게 아님. 다음 단계만 구현 가능 수준.**
 
-- **Phase 1 — ✅ 구현 준비 완료.** 모델·임계값·차원·버전태그 확정(§8), §9에 파일 단위 체크리스트, 기반 커밋됨. 바로 착수 가능.
+- **Phase 1 — ✅ 구현 완료(2026-06-26).** 마이그레이션 0005 + 임베딩 핫패스 분리(`ctx.waitUntil` 백그라운드 기록) + bge-m3 게이팅(0.68) + 멱등 백필 + 유닛 테스트. §9 참고. **남은 건 배포 후 실측 1회**(§6: bge-m3 한국어 품질·엣지 지연·임계값 실데이터 미세조정, `ctx.waitUntil` 백그라운드 기록 동작 확인).
 - **Phase 2 — 🟡 방향·스텝은 있으나 착수 전 "상세 설계 1회" 필요.** §2의 Phase 2는 *개요*일 뿐, 아래는 **아직 미설계 — 구현 전 못 박을 것**:
   1. `/api/tm` **요청/응답 계약**(정확한 형태·매치 정렬·반환 필드).
   2. **TM 패널 UX** — 매치 표시 방식, 옵트인 체크, 일치율 표기, 빈/로딩 상태.

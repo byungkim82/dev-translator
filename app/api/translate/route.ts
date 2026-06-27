@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { streamGeminiText, cleanGeminiOutput } from "@/lib/ai/gemini";
-import { getEmbedding } from "@/lib/ai/embedding";
 import { buildTranslationPrompt, type UserContext } from "@/lib/prompts";
 import { generateId } from "@/lib/utils";
 import { findCachedTranslation, normalizeKoreanInput } from "@/lib/cache";
-import { selectFewShotExamples, type FewShotExample } from "@/lib/examples";
-import type { TranslationWithEmbedding } from "@/lib/similarity";
 import { encodeStreamEvent, type StreamEvent } from "@/lib/stream-protocol";
-import { finalizeTranslation } from "@/lib/translate-core";
+import { finalizeTranslation, recordEdgeEmbedding } from "@/lib/translate-core";
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +30,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { env } = await getCloudflareContext();
+    const { env, ctx } = await getCloudflareContext();
     const cfEnv = env as CloudflareEnv;
 
     // W9: exact-match cache. An identical (text, style, model) returns the stored
@@ -74,42 +71,18 @@ export async function POST(request: NextRequest) {
     ).first<UserContext & { glossary?: string }>();
     const userContext: UserContext = settingsRow || {};
 
-    // P14: compute the input embedding once, up front. Used both to find similar
-    // past favorited translations (few-shot style examples) and, later, for storage.
-    let embedding: number[] | null = null;
-    if (cfEnv.OPENAI_API_KEY) {
-      try {
-        embedding = await getEmbedding(koreanText, cfEnv.OPENAI_API_KEY);
-      } catch (e) {
-        console.error("Embedding generation failed:", e);
-        // Continue without embedding (no examples, no stored vector).
-      }
-    }
-
-    // P14: personalized few-shot examples from the user's own favorited history.
-    // No embedding (e.g. no OpenAI key) or no close favorites => stays empty, so
-    // the prompt falls back to the static examples unchanged (zero behavior change).
-    let examples: FewShotExample[] = [];
-    if (embedding) {
-      const favorites = await cfEnv.DB.prepare(
-        `SELECT id, korean_text, english_text, embedding, model, style, category, is_favorite, created_at
-         FROM translations
-         WHERE is_favorite = 1 AND embedding IS NOT NULL
-         ORDER BY created_at DESC
-         LIMIT 200`
-      ).all<TranslationWithEmbedding>();
-      examples = selectFewShotExamples(embedding, favorites.results ?? []);
-    }
-
-    // Build the prompt, then stream the fresh translation (W7) as NDJSON:
-    // a `meta` line, `delta` lines as Gemini emits tokens, then `done` (with the
-    // DB id) after the row is persisted. The exact-match cache hit and pre-stream
-    // errors above still return plain JSON — only this path streams.
-    const prompt = buildTranslationPrompt(koreanText, resolvedStyle, userContext, settingsRow?.glossary, examples);
+    // P16 Phase 1: NO embedding on the hot path. The old inline OpenAI embedding
+    // (and the P14 few-shot lookup it fed) added a ~1.3s stall before the first
+    // token. The embedding is now recorded in the background after the stream
+    // closes (see ctx.waitUntil below), and P14 examples return in Phase 2 as an
+    // opt-in. With no examples, the prompt falls back to the static examples
+    // unchanged — so this is a no-op for prompt content, just faster.
+    const prompt = buildTranslationPrompt(koreanText, resolvedStyle, userContext, settingsRow?.glossary);
     const id = generateId();
     const now = new Date().toISOString();
     const geminiKey = cfEnv.GEMINI_API_KEY;
     const db = cfEnv.DB;
+    const ai = cfEnv.AI;
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
@@ -133,19 +106,32 @@ export async function POST(request: NextRequest) {
           }
 
           const englishText = cleanGeminiOutput(full);
-          // Persist after the full text is known, before closing the stream.
+          // Persist after the full text is known, before closing the stream. The
+          // vector column starts null and is filled by the background task below.
           await finalizeTranslation(db, {
             id,
             koreanText,
             englishText,
             model: resolvedModel,
             style: resolvedStyle,
-            embedding,
+            embedding: null,
             createdAt: now,
           });
 
           send({ type: "done", id, english_text: englishText, truncated, created_at: now });
           controller.close();
+
+          // Record the bge-m3 embedding off the hot path: ctx.waitUntil keeps the
+          // worker alive past the response so this never delays the translation.
+          // Best-effort — on failure the row just keeps a null vector and the
+          // backfill can pick it up later.
+          if (ai) {
+            ctx.waitUntil(
+              recordEdgeEmbedding(db, ai, { id, text: koreanText }).catch((e) => {
+                console.error("Background embedding failed:", e);
+              })
+            );
+          }
         } catch (err) {
           // The HTTP status is already 200, so surface mid-stream failures in-band.
           send({
