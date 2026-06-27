@@ -147,6 +147,9 @@ export default function HomePage() {
 
     setIsLoading(true);
     setIsStreaming(false);
+    // Clear the previous translation so its text doesn't linger under the
+    // streaming cursor while the first token of the new one is on its way.
+    setResult(null);
     try {
       const res = await fetch("/api/translate", {
         method: "POST",

@@ -299,4 +299,76 @@ describe("HomePage streaming (W7)", () => {
     await translateStreaming(mockFetchStream(events));
     await screen.findByText("스트림 실패");
   });
+
+  it("clears the previous translation when a new one starts (no stale text under the cursor)", async () => {
+    const enc = new TextEncoder();
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const secondBody = new ReadableStream<Uint8Array>({
+      start(c) {
+        controller = c;
+      },
+    });
+
+    let translateCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url === "/api/settings") {
+          return jsonResponse({
+            settings: { default_model: "gemini-flash-lite", default_style: "casual-work", auto_copy: 0 },
+          });
+        }
+        if (url === "/api/similar") return jsonResponse({ similar: [] });
+        if (url === "/api/translate") {
+          translateCalls += 1;
+          // First call: a cache-hit JSON so a result is on screen; second: a stream we control.
+          if (translateCalls === 1) {
+            return jsonResponse({ ...TRANSLATION, english_text: "First result" });
+          }
+          return {
+            ok: true,
+            body: secondBody,
+            headers: { get: (k: string) => (k.toLowerCase() === "content-type" ? "application/x-ndjson" : null) },
+          } as unknown as Response;
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      })
+    );
+
+    const user = userEvent.setup();
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    render(<HomePage />);
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith("/api/settings"));
+
+    const textarea = screen.getByPlaceholderText(/번역할 텍스트/);
+    await user.type(textarea, "첫번째");
+    await user.keyboard("{Enter}");
+    await screen.findByText("First result");
+
+    // Start a second translation; the stream hasn't emitted any delta yet.
+    await user.clear(textarea);
+    await user.type(textarea, "두번째");
+    await user.keyboard("{Enter}");
+
+    // The stale first result must be gone before the new text streams in.
+    await waitFor(() => expect(screen.queryByText("First result")).toBeNull());
+
+    // Now stream the second translation.
+    controller.enqueue(enc.encode(JSON.stringify(STREAM[0]) + "\n"));
+    controller.enqueue(enc.encode(JSON.stringify({ type: "delta", text: "Second result" }) + "\n"));
+    controller.enqueue(
+      enc.encode(
+        JSON.stringify({
+          type: "done",
+          id: "2",
+          english_text: "Second result",
+          truncated: false,
+          created_at: "2026-01-01T00:00:00.000Z",
+        }) + "\n"
+      )
+    );
+    controller.close();
+
+    await screen.findByText("Second result");
+  });
 });
