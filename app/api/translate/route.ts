@@ -6,13 +6,21 @@ import { generateId } from "@/lib/utils";
 import { findCachedTranslation, normalizeKoreanInput } from "@/lib/cache";
 import { encodeStreamEvent, type StreamEvent } from "@/lib/stream-protocol";
 import { finalizeTranslation, recordEdgeEmbedding } from "@/lib/translate-core";
+import { fetchExamplesByIds, type FewShotExample } from "@/lib/examples";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as { koreanText?: string; model?: string; style?: string };
+    const body = await request.json() as { koreanText?: string; model?: string; style?: string; exampleIds?: unknown };
     const { koreanText: rawKoreanText, model, style } = body;
     const resolvedModel = model || "gemini-flash-lite";
     const resolvedStyle = style || "casual-work";
+
+    // P16 Phase 2: opt-in TM few-shot example ids selected in the as-you-type
+    // panel. Absent/empty => plain request, behaving exactly as Phase 1.
+    const exampleIds = Array.isArray(body.exampleIds)
+      ? body.exampleIds.filter((x): x is string => typeof x === "string")
+      : [];
+    const hasExamples = exampleIds.length > 0;
 
     if (!rawKoreanText || typeof rawKoreanText !== "string") {
       return NextResponse.json(
@@ -37,25 +45,30 @@ export async function POST(request: NextRequest) {
     // translation instantly — no Gemini/embedding call, no duplicate row. model
     // and style are part of the key, so re-requesting the same Korean with a
     // better model (or a different style) still translates fresh.
-    const cached = await findCachedTranslation(
-      cfEnv.DB,
-      koreanText,
-      resolvedStyle,
-      resolvedModel
-    );
-    if (cached) {
-      return NextResponse.json({
-        id: cached.id,
-        korean_text: cached.korean_text,
-        english_text: cached.english_text,
-        model: cached.model,
-        style: cached.style,
-        category: cached.category,
-        is_favorite: Boolean(cached.is_favorite),
-        created_at: cached.created_at,
-        cached: true,
-        truncated: false,
-      });
+    // P16 Phase 2: example requests skip the cache entirely (force-fresh) — the
+    // few-shot examples are meant to re-shape the output, and findCachedTranslation
+    // only returns plain (had_examples=0) rows anyway.
+    if (!hasExamples) {
+      const cached = await findCachedTranslation(
+        cfEnv.DB,
+        koreanText,
+        resolvedStyle,
+        resolvedModel
+      );
+      if (cached) {
+        return NextResponse.json({
+          id: cached.id,
+          korean_text: cached.korean_text,
+          english_text: cached.english_text,
+          model: cached.model,
+          style: cached.style,
+          category: cached.category,
+          is_favorite: Boolean(cached.is_favorite),
+          created_at: cached.created_at,
+          cached: true,
+          truncated: false,
+        });
+      }
     }
 
     if (!cfEnv.GEMINI_API_KEY) {
@@ -71,13 +84,20 @@ export async function POST(request: NextRequest) {
     ).first<UserContext & { glossary?: string }>();
     const userContext: UserContext = settingsRow || {};
 
-    // P16 Phase 1: NO embedding on the hot path. The old inline OpenAI embedding
-    // (and the P14 few-shot lookup it fed) added a ~1.3s stall before the first
-    // token. The embedding is now recorded in the background after the stream
-    // closes (see ctx.waitUntil below), and P14 examples return in Phase 2 as an
-    // opt-in. With no examples, the prompt falls back to the static examples
-    // unchanged — so this is a no-op for prompt content, just faster.
-    const prompt = buildTranslationPrompt(koreanText, resolvedStyle, userContext, settingsRow?.glossary);
+    // P16 Phase 2: personalized few-shot examples from the user's opt-in TM panel
+    // selections. Looked up BY ID (no embedding on the hot path — Phase 1's whole
+    // point). Best-effort: a lookup failure (or no ids) leaves examples empty, so
+    // the prompt falls back to the static examples unchanged (no regression).
+    let examples: FewShotExample[] = [];
+    if (hasExamples) {
+      try {
+        examples = await fetchExamplesByIds(cfEnv.DB, exampleIds);
+      } catch (e) {
+        console.error("Example lookup failed:", e);
+      }
+    }
+
+    const prompt = buildTranslationPrompt(koreanText, resolvedStyle, userContext, settingsRow?.glossary, examples);
     const id = generateId();
     const now = new Date().toISOString();
     const geminiKey = cfEnv.GEMINI_API_KEY;
@@ -116,6 +136,7 @@ export async function POST(request: NextRequest) {
             style: resolvedStyle,
             embedding: null,
             createdAt: now,
+            hadExamples: hasExamples,
           });
 
           send({ type: "done", id, english_text: englishText, truncated, created_at: now });

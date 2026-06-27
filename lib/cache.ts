@@ -29,13 +29,16 @@ export function normalizeKoreanInput(text: string): string {
 
 const LOOKUP_SQL = `SELECT id, korean_text, english_text, model, style, category, is_favorite, created_at
    FROM translations
-   WHERE korean_text = ? AND style = ? AND model = ?
+   WHERE korean_text = ? AND style = ? AND model = ? AND had_examples = 0
    ORDER BY created_at DESC
    LIMIT 1`;
 
 // Returns the stored translation for an identical (text, style, model), or null.
 // model and style are part of the key on purpose: switching to a better model
 // (or a different style) misses the cache and produces a fresh translation.
+// had_examples = 0 keeps this to PLAIN translations only (P16 Phase 2): a request
+// that opted into TM few-shot examples produces an example-influenced result that
+// must never be served back to a plain request — so those rows are excluded here.
 export async function findCachedTranslation(
   db: CacheDB,
   koreanText: string,

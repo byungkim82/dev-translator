@@ -24,10 +24,13 @@ export interface NewTranslationRow {
   style: string;
   embedding: number[] | null;
   createdAt: string;
+  // P16 Phase 2: true if this translation used opt-in TM few-shot examples, so
+  // the W9 plain cache (findCachedTranslation) can exclude it.
+  hadExamples: boolean;
 }
 
-const INSERT_SQL = `INSERT INTO translations (id, korean_text, english_text, model, style, embedding, char_count, token_count, created_at, updated_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+const INSERT_SQL = `INSERT INTO translations (id, korean_text, english_text, model, style, embedding, char_count, token_count, created_at, updated_at, had_examples)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 // Persist a new translation row. char_count/token_count are derived here so the
 // route doesn't repeat that, and created_at is used for both created/updated.
@@ -47,7 +50,8 @@ export async function finalizeTranslation(
       row.koreanText.length,
       estimateTokens(row.koreanText),
       row.createdAt,
-      row.createdAt
+      row.createdAt,
+      row.hadExamples ? 1 : 0
     )
     .run();
 }

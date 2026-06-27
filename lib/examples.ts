@@ -39,3 +39,47 @@ export function buildExamplesLine(examples: FewShotExample[]): string {
   const lines = examples.map((e) => `- ${e.korean} → ${e.english}`).join("\n");
   return `\nHere is how you've translated similar messages before — match this voice:\n${lines}\n`;
 }
+
+// The slice of the D1 query API fetchExamplesByIds relies on (injected for tests).
+export interface ExamplesDB {
+  prepare(query: string): {
+    bind(...values: unknown[]): {
+      all<T = unknown>(): Promise<{ results?: T[] }>;
+    };
+  };
+}
+
+interface ExampleRow {
+  id: string;
+  korean_text: string;
+  english_text: string;
+}
+
+// P16 Phase 2: fetch specific past translations BY ID — the user's opt-in TM
+// selections from the as-you-type panel — and format them as few-shot examples.
+// No embedding: the ids are already known, so this stays off the hot path's
+// latency budget. Capped at `limit` to bound prompt size; ids should arrive in
+// similarity order (strongest first) so the cap keeps the best, and the result
+// is re-sorted to the input id order since SQL `IN` does not preserve it.
+export async function fetchExamplesByIds(
+  db: ExamplesDB,
+  ids: string[],
+  limit: number = EXAMPLE_LIMIT
+): Promise<FewShotExample[]> {
+  const capped = ids.slice(0, limit);
+  if (capped.length === 0) return [];
+
+  const placeholders = capped.map(() => "?").join(", ");
+  const result = await db
+    .prepare(
+      `SELECT id, korean_text, english_text FROM translations WHERE id IN (${placeholders})`
+    )
+    .bind(...capped)
+    .all<ExampleRow>();
+
+  const byId = new Map((result.results ?? []).map((r) => [r.id, r]));
+  return capped
+    .map((id) => byId.get(id))
+    .filter((r): r is ExampleRow => Boolean(r))
+    .map((r) => ({ korean: r.korean_text, english: r.english_text }));
+}

@@ -27,6 +27,7 @@ const ROW: NewTranslationRow = {
   style: "casual-work",
   embedding: [0.1, 0.2],
   createdAt: "2026-01-01T00:00:00.000Z",
+  hadExamples: false,
 };
 
 describe("finalizeTranslation", () => {
@@ -44,7 +45,8 @@ describe("finalizeTranslation", () => {
       "확인 부탁해".length,
       Math.ceil("확인 부탁해".length / 1.3),
       "2026-01-01T00:00:00.000Z",
-      "2026-01-01T00:00:00.000Z"
+      "2026-01-01T00:00:00.000Z",
+      0
     );
     expect(run).toHaveBeenCalledOnce();
   });
@@ -63,8 +65,17 @@ describe("finalizeTranslation", () => {
       "확인 부탁해".length,
       Math.ceil("확인 부탁해".length / 1.3),
       "2026-01-01T00:00:00.000Z",
-      "2026-01-01T00:00:00.000Z"
+      "2026-01-01T00:00:00.000Z",
+      0
     );
+  });
+
+  it("stores had_examples = 1 when the translation used opt-in examples", async () => {
+    const { db, bind } = makeDb();
+    await finalizeTranslation(db, { ...ROW, hadExamples: true });
+
+    // had_examples is the last bound column.
+    expect(bind.mock.calls[0].at(-1)).toBe(1);
   });
 });
 

@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildExamplesLine,
+  fetchExamplesByIds,
   selectFewShotExamples,
   EXAMPLE_SIMILARITY_THRESHOLD,
+  type ExamplesDB,
   type FewShotExample,
 } from "./examples";
 import type { TranslationWithEmbedding } from "./similarity";
@@ -83,5 +85,57 @@ describe("buildExamplesLine", () => {
     const line = buildExamplesLine(examples);
     expect(line).toContain("match this voice");
     expect(line).toContain("- 배포 다시 돌릴게 → I'll re-run the deploy");
+  });
+});
+
+interface ExampleRow {
+  id: string;
+  korean_text: string;
+  english_text: string;
+}
+
+function row(id: string, korean_text: string, english_text: string): ExampleRow {
+  return { id, korean_text, english_text };
+}
+
+function makeExamplesDb(rows: ExampleRow[]) {
+  const all = vi.fn(async () => ({ results: rows }));
+  const bind = vi.fn(() => ({ all }));
+  const prepare = vi.fn(() => ({ bind }));
+  const db = { prepare } as unknown as ExamplesDB;
+  return { db, prepare, bind, all };
+}
+
+describe("fetchExamplesByIds", () => {
+  it("returns examples in the requested id order (not SQL IN order)", async () => {
+    const { db, bind } = makeExamplesDb([
+      row("a", "리뷰 부탁", "Mind reviewing?"),
+      row("b", "배포함", "Deployed it"),
+    ]);
+    const result = await fetchExamplesByIds(db, ["b", "a"]);
+    expect(result).toEqual([
+      { korean: "배포함", english: "Deployed it" },
+      { korean: "리뷰 부탁", english: "Mind reviewing?" },
+    ]);
+    expect(bind).toHaveBeenCalledWith("b", "a");
+  });
+
+  it("caps at the limit, querying only the first N ids", async () => {
+    const { db, bind } = makeExamplesDb([]);
+    await fetchExamplesByIds(db, ["a", "b", "c", "d"], 2);
+    expect(bind).toHaveBeenCalledWith("a", "b");
+  });
+
+  it("returns [] for no ids without touching the DB", async () => {
+    const { db, prepare } = makeExamplesDb([]);
+    const result = await fetchExamplesByIds(db, []);
+    expect(result).toEqual([]);
+    expect(prepare).not.toHaveBeenCalled();
+  });
+
+  it("drops ids that have no matching row", async () => {
+    const { db } = makeExamplesDb([row("a", "리뷰 부탁", "Mind reviewing?")]);
+    const result = await fetchExamplesByIds(db, ["a", "missing"]);
+    expect(result).toEqual([{ korean: "리뷰 부탁", english: "Mind reviewing?" }]);
   });
 });

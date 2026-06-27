@@ -1,6 +1,6 @@
 # 설계안 — As-you-type 번역 메모리 (Translation Memory)
 
-> **상태:** Phase 1 구현 완료 (핫패스 임베딩 분리) · Phase 2 상세 설계 완료(§11), 결정 확인 후 구현
+> **상태:** Phase 1 완료 · Phase 2 설계 완료(§11) + PR-a 백엔드 구현 완료 · PR-b 프론트 남음
 > **작성:** 2026-06-26
 > **관련:** P14(개인화 few-shot)·W6(유사 제안)·T16(Vectorize) 를 통합/대체. 임베딩 지연(1.3s) 문제 해결.
 
@@ -188,7 +188,7 @@
 - **클라 컴포넌트(jsdom+RTL+가짜 타이머):** 디바운스 500ms 후 1회 조회 · <3자 게이트 · 쿼리캐시(중복 fetch 0) · AbortController 취소 · 체크 토글 → `selectedExampleIds` · 번역 바디에 `exampleIds` 실림 · 패널 로딩/빈 상태 · 비즐겨찾기 체크박스 부재.
 - **무회귀:** `exampleIds=[]`면 프롬프트·캐시 동작이 Phase 1과 동일함을 명시 테스트.
 
-### 11.8 정해주실 결정 (Phase 2)
+### 11.8 정해주실 결정 (Phase 2) — ✅ 확정 2026-06-26 (A~E 추천안 그대로 사인오프)
 | # | 결정 | 추천 |
 |---|------|------|
 | A | 조회: `/api/similar` 재사용(무변경) vs 신규 `/api/tm` | **재사용** — 응답이 이미 충분(`is_favorite`+`similarity`), 표면 0 |
@@ -198,6 +198,6 @@
 | E | 예시 출처: 즐겨찾기 매치만 체크 가능(P14 ①) | **즐겨찾기만** — 비즐겨찾기는 재사용만 |
 
 ### 11.9 단계 분할 (독립 배포 가능한 PR)
-1. **PR-a (백엔드, 무 UI 변화):** 0006 마이그레이션 + `had_examples` 저장/필터 + `fetchExamplesByIds` + 라우트 `exampleIds` 수용(없으면 무회귀) + 유닛 테스트. *클라가 아직 안 보내므로 동작 동일, 안전 선행.*
-2. **PR-b (프론트):** `onDraftChange` + 디바운스 TM 조회 + `TmPanel` 체크박스 + `exampleIds` 전달 + 컴포넌트 테스트. PR-a 위에서 기능 활성.
+1. ✅ **PR-a (백엔드, 무 UI 변화) — 구현 완료 2026-06-26.** 0006 마이그레이션(`had_examples`) + `finalizeTranslation` 저장 + `findCachedTranslation` `had_examples=0` 필터 + `fetchExamplesByIds`(id 조회·순서보존·캡) + 라우트 `exampleIds` 수용(없으면 무회귀: 캐시·프롬프트 Phase 1과 동일) + 예시요청 캐시 read 스킵. 유닛 테스트 +6(총 102) · lint·tsc·`next build` 통과. *클라가 아직 `exampleIds`를 안 보내므로 배포해도 동작 동일 — 안전 선행.*
+2. 🔲 **PR-b (프론트) — 남음.** `TranslateForm.onDraftChange` + 디바운스(500ms·≥3자·쿼리캐시·abort) TM 조회 + `SimilarSuggestions`→`TmPanel`(즐겨찾기 예시 체크박스, 매치 있으면 상시 렌더) + `selectedExampleIds`→`exampleIds` 전달 + 컴포넌트 테스트. PR-a 위에서 기능 활성.
 → PR-a를 먼저 머지하면 클라 없이도 스키마/라우트가 안전하게 준비됨(점진).

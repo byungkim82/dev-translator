@@ -63,4 +63,11 @@ describe("findCachedTranslation", () => {
       findCachedTranslation(db, "처음 보는 문장", "casual-work", "gemini-flash-lite")
     ).resolves.toBeNull();
   });
+
+  it("restricts the lookup to plain rows (had_examples = 0)", async () => {
+    const { db, prepare } = makeDb(null);
+    await findCachedTranslation(db, "확인 부탁해", "casual-work", "gemini-flash-lite");
+    // Example-influenced rows must never be served to a plain request (P16 P2).
+    expect(prepare).toHaveBeenCalledWith(expect.stringContaining("had_examples = 0"));
+  });
 });
