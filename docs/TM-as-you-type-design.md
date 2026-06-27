@@ -1,6 +1,6 @@
 # 설계안 — As-you-type 번역 메모리 (Translation Memory)
 
-> **상태:** Phase 1 구현 완료 (핫패스 임베딩 분리) · Phase 2 상세 설계 대기
+> **상태:** Phase 1 구현 완료 (핫패스 임베딩 분리) · Phase 2 상세 설계 완료(§11), 결정 확인 후 구현
 > **작성:** 2026-06-26
 > **관련:** P14(개인화 few-shot)·W6(유사 제안)·T16(Vectorize) 를 통합/대체. 임베딩 지연(1.3s) 문제 해결.
 
@@ -121,11 +121,83 @@
 **모든 단계가 같은 깊이로 설계된 게 아님. 다음 단계만 구현 가능 수준.**
 
 - **Phase 1 — ✅ 구현 완료(2026-06-26).** 마이그레이션 0005 + 임베딩 핫패스 분리(`ctx.waitUntil` 백그라운드 기록) + bge-m3 게이팅(0.68) + 멱등 백필 + 유닛 테스트. §9 참고. **남은 건 배포 후 실측 1회**(§6: bge-m3 한국어 품질·엣지 지연·임계값 실데이터 미세조정, `ctx.waitUntil` 백그라운드 기록 동작 확인).
-- **Phase 2 — 🟡 방향·스텝은 있으나 착수 전 "상세 설계 1회" 필요.** §2의 Phase 2는 *개요*일 뿐, 아래는 **아직 미설계 — 구현 전 못 박을 것**:
-  1. `/api/tm` **요청/응답 계약**(정확한 형태·매치 정렬·반환 필드).
-  2. **TM 패널 UX** — 매치 표시 방식, 옵트인 체크, 일치율 표기, 빈/로딩 상태.
-  3. **`exampleIds` 흐름** — 패널 선택 → 번역 요청 → id로 예시 조회·주입(임베딩 없이)의 구체 경로.
-  4. ⚠️ **W9 캐시 키에 "예시 적용 여부" 반영 설계** — Q1 글로서리 때와 같은 *캐시 정합성 트랩*. §2엔 "반영"이라고만 적혀 있고 설계는 안 됨.
-  5. **임계값(0.68)의 패널 동작** — 표시 컷오프 vs 주입 컷오프 분리 여부.
-  → Phase 1 결과(bge-m3 실동작·코퍼스)를 본 뒤 상세화하는 게 정확함.
+- **Phase 2 — ✅ 상세 설계 완료(§11), 구현 대기.** §10에서 "구현 전 못 박을 것"으로 꼽은 5개(① 조회 계약 ② 패널 UX ③ `exampleIds` 흐름 ④ ⚠️W9 정합성 ⑤ 컷오프)를 §11에서 전부 확정. Phase 1 실측 결과(1068행·bge-m3·0.68 동작) 위에서 설계. **남은 건 §11.8 결정 5건 확인 → 구현.**
 - **Phase 3 — ⚪ 보류된 옵션, 빌드 계획 없음(의도적).** 리서치 발견(§Q4, e5-small·WASM·2-모델 하이브리드)만 기록. **추진을 정하면 그때 상세 설계** — 지금은 미작성.
+
+---
+
+## 11. Phase 2 상세 설계 — as-you-type TM 패널 (2026-06-26)
+
+> §10이 "구현 전 못 박을 것"으로 꼽은 5개를 Phase 1 실측(1068행·bge-m3·0.68 동작) 위에서 확정. **핵심 발견: Phase 1이 이미 `/api/similar`를 bge-m3·버전게이팅·0.68로 바꿔놨고, 그 응답이 매치별 `similarity`+`is_favorite`를 이미 포함** → Phase 2 백엔드는 원래 개요(§2/§7)보다 훨씬 작다. 백엔드 신규 표면은 사실상 `exampleIds` 처리 + 캐시 정합성뿐. as-you-type는 대부분 **클라 재배선**.
+
+### 11.0 데이터 흐름 (확정)
+```
+[타이핑] ─(500ms 디바운스·≥3자·쿼리캐시·AbortController)→ POST /api/similar { text }
+        → bge-m3 임베딩 + embedding_version='bgem3-1024' 스캔 + 0.68
+        → { similar: [{id, korean_text, english_text, is_favorite, similarity, …}] }
+        → TM 패널: 매치% + [이걸로 교체](모든 매치) + ☑[예시로 참고](즐겨찾기 매치만)
+[예시 체크] → selectedExampleIds (현재 매치에 존재하는 id만 유지)
+[번역하기] → POST /api/translate { koreanText, model, style, exampleIds:[…] }
+        → exampleIds 있으면: W9 캐시 read 스킵(force-fresh) + id로 예시 조회·주입(임베딩 0)
+        → 스트리밍(W7) → finalizeTranslation(had_examples = exampleIds?1:0)
+        → 백그라운드 bge-m3 임베딩 기록 (Phase 1 그대로)
+[plain 번역(예시 0)] → W9 캐시 read는 had_examples=0 행만 매치(예시본이 plain 캐시를 오염 못 함)
+```
+
+### 11.1 조회 엔드포인트 (gap ①) — `/api/similar` 그대로 재사용, 신규 라우트 없음
+- **계약(이미 존재, 무변경):** `POST /api/similar { text }` → `{ similar: SimilarResult[] }`. `SimilarResult`는 행 전체 + `similarity`. `similarity` 내림차순 정렬, `findSimilarTranslations` limit=3.
+- **신규 `/api/tm` 불필요:** 응답이 `is_favorite`+`similarity`를 이미 담아 패널이 필요로 하는 전부를 제공. `favoritesOnly` 파라미터도 **추가 안 함** — true로 좁히면 *비즐겨찾기 재사용 후보*(W6)가 사라짐. 전체를 스캔하고(1068행 코사인 ≈ 수 ms, 무시 가능) **체크박스만 `is_favorite`로 게이팅**.
+- as-you-type는 **호출 시점**만 바뀜(번역 제출 시 → 타이핑 중 디바운스). 라우트는 그대로.
+
+### 11.2 TM 패널 UX (gap ②)
+- **배치:** 입력 폼 **아래, 결과 위**. 기존 `SimilarSuggestions`(결과 있을 때만 렌더)를 `TmPanel`로 확장 — **매치가 있으면 타이핑 중에도 표시**(`result` 게이트 제거). 번역 후에도 유지.
+- **매치 카드:** `87% 유사` 뱃지 · 과거 한국어 · 과거 영어 · 우측에 두 어포던스:
+  - **`이걸로 교체`** 버튼 — 모든 매치(재사용=W6, `handleUseSimilar` 그대로). 번역 없이 결과를 그 과거 번역으로 설정.
+  - **`☑ 예시로 참고`** 체크박스 — **즐겨찾기 매치만 활성**(P14 ①: 예시는 즐겨찾기에서). 비즐겨찾기는 체크박스 숨김(재사용만 가능).
+- **선택 요약줄:** 체크가 1개+이면 `예시 N개 적용 — 번역에 반영됩니다`.
+- **로딩:** 조회 중 작은 스피너/`검색 중…`. **빈/짧은 입력(<3자):** 패널 `return null`(현재와 동일).
+- **클라 메커니즘:** 디바운스 500ms · 최소 3자 · `Map<string, SimilarResult[]>` 쿼리캐시(백스페이스 재입력 시 재호출 0) · `AbortController`로 인플라이트 취소. (§0 관례)
+
+### 11.3 `exampleIds` 흐름 (gap ③)
+- **수집:** 패널 체크 → `selectedExampleIds: Set<string>`(page 상태). 매치 갱신 시 **현재 매치에 없는 id는 prune**(스테일 예시 방지).
+- **전송:** `executeTranslation`이 `/api/translate` 바디에 `exampleIds: [...]` 추가(유사도 순). 빈 배열이면 Phase 1과 글자단위 동일(=정적 폴백, 무회귀).
+- **주입(라우트):** `exampleIds` 비어있지 않으면 신규 `fetchExamplesByIds(db, ids, limit=3)`로 `SELECT id, korean_text, english_text FROM translations WHERE id IN (…)` → `FewShotExample[]` → 기존 `buildTranslationPrompt(…, examples)` 주입. **임베딩 0**(id 직접 조회). `EXAMPLE_LIMIT`(3)으로 캡, 프롬프트 크기 방어.
+- **순수 함수 분리:** 선택/포맷은 이미 `lib/examples.ts`. 조회는 `fetchExamplesByIds`(주입 DB로 유닛 테스트).
+
+### 11.4 ⚠️ W9 캐시 정합성 (gap ④) — `had_examples` 불리언 컬럼
+- **트랩:** W9 키 = (정규화 텍스트, style, model). 예시 적용 여부가 키에 없으면 → "결제 확인"을 *예시 없이* 캐시 → 이후 *예시 체크 후* 같은 텍스트 요청이 **캐시 히트로 예시 무시**(역도 성립). Q1 글로서리와 동형 트랩.
+- **불변식:** *plain(예시 0) 요청은 plain 번역만 반환. 예시 요청은 항상 fresh.*
+- **확정 설계(최소·가역):**
+  1. 마이그레이션 `0006_add_had_examples.sql`: `ALTER TABLE translations ADD COLUMN had_examples INTEGER NOT NULL DEFAULT 0`. (기존 행=0=plain, 정확.)
+  2. `finalizeTranslation`에 `hadExamples` 추가 → INSERT 컬럼/바인딩 1개 확장.
+  3. `findCachedTranslation` 조회에 `AND had_examples = 0` 추가 → **plain 요청은 plain 행만 매치**. 시그니처 무변경.
+  4. 라우트: `exampleIds` 있으면 **캐시 read 스킵**(force-fresh) + `had_examples=1`로 저장.
+- **반려한 대안:** (a) 무마이그레이션 = 예시본이 plain 요청에 새어나옴(불변식 위반). (b) 예시 id 집합 시그니처 컬럼으로 *정확 예시조합 캐싱* = 단일사용자 도구엔 과설계. → 불리언이 최소이면서 불변식 보장.
+- **참고:** Q4의 `forceFresh`(같은 파라미터 강제 재번역)와 직교·양립. 예시 요청은 그 자체로 force-fresh.
+
+### 11.5 임계값 동작 (gap ⑤) — 표시·주입 단일 0.68
+- **단일 컷오프 0.68**(표시=주입). 주입이 **옵트인**(사용자가 직접 체크)이라 자동주입 안전장치용 별도 상한이 불필요. §8: 0.68 = "강한 매치만"(오탐 0). 약한 FYI 매치를 더 보고 싶다는 실사용 피드백이 오면 그때 *낮은 표시 컷오프*를 추가(후순위, 지금 미설계).
+- **강한 매치(≥0.95 근사) 특별취급 안 함**(v1): 100% 텍스트 일치는 이미 W9가 처리. 0.68~1.0은 카드의 % 표기가 사용자 판단을 안내, 어포던스(교체/예시)는 동일. 티어드 동작은 후순위.
+
+### 11.6 영향 파일 (Phase 2)
+- **백엔드(소):** `migrations/0006_add_had_examples.sql`(신규) · `lib/translate-core.ts`(`hadExamples` 저장) · `lib/cache.ts`(`had_examples=0` 필터) · `lib/examples.ts`(`fetchExamplesByIds`) · `app/api/translate/route.ts`(`exampleIds` 수용·캐시 스킵·예시 주입·`had_examples` 저장). **`/api/similar` 무변경.**
+- **프론트(중):** `components/TranslateForm.tsx`(`onDraftChange?` 추가, 가산) · `app/page.tsx`(디바운스·쿼리캐시·abort TM 조회 → `tmMatches`·`selectedExampleIds`, `exampleIds` 전달, 패널 상시 렌더) · `components/SimilarSuggestions.tsx` → `TmPanel`(체크박스 선택 props, 매치 있으면 렌더).
+
+### 11.7 테스트 계획 (작업 규칙)
+- **순수 유닛:** `fetchExamplesByIds`(가짜 DB — id 바인딩·limit 캡·빈셋) · `findCachedTranslation`의 `had_examples=0` 필터(바인딩/쿼리) · `finalizeTranslation`의 `had_examples` 바인딩 · `selectFewShotExamples`/`buildExamplesLine`(기존 유지, 차원무관).
+- **클라 컴포넌트(jsdom+RTL+가짜 타이머):** 디바운스 500ms 후 1회 조회 · <3자 게이트 · 쿼리캐시(중복 fetch 0) · AbortController 취소 · 체크 토글 → `selectedExampleIds` · 번역 바디에 `exampleIds` 실림 · 패널 로딩/빈 상태 · 비즐겨찾기 체크박스 부재.
+- **무회귀:** `exampleIds=[]`면 프롬프트·캐시 동작이 Phase 1과 동일함을 명시 테스트.
+
+### 11.8 정해주실 결정 (Phase 2)
+| # | 결정 | 추천 |
+|---|------|------|
+| A | 조회: `/api/similar` 재사용(무변경) vs 신규 `/api/tm` | **재사용** — 응답이 이미 충분(`is_favorite`+`similarity`), 표면 0 |
+| B | W9 정합성: `had_examples` 불리언 컬럼(0006)+예시 force-fresh | **예** — 불변식 보장, 추가 컬럼 1개(가역·기본값 0) |
+| C | 컷오프: 표시·주입 단일 0.68 | **단일** — 옵트인이라 분리 불필요, 후에 재검토 |
+| D | 강한 매치 자동주입 vs 항상 옵트인 | **항상 옵트인** — 설계 일관·사용자 의도 |
+| E | 예시 출처: 즐겨찾기 매치만 체크 가능(P14 ①) | **즐겨찾기만** — 비즐겨찾기는 재사용만 |
+
+### 11.9 단계 분할 (독립 배포 가능한 PR)
+1. **PR-a (백엔드, 무 UI 변화):** 0006 마이그레이션 + `had_examples` 저장/필터 + `fetchExamplesByIds` + 라우트 `exampleIds` 수용(없으면 무회귀) + 유닛 테스트. *클라가 아직 안 보내므로 동작 동일, 안전 선행.*
+2. **PR-b (프론트):** `onDraftChange` + 디바운스 TM 조회 + `TmPanel` 체크박스 + `exampleIds` 전달 + 컴포넌트 테스트. PR-a 위에서 기능 활성.
+→ PR-a를 먼저 머지하면 클라 없이도 스키마/라우트가 안전하게 준비됨(점진).

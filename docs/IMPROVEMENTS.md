@@ -171,7 +171,7 @@ B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣
 - **Phase 1a(스팟체크)**: `[ai]` 바인딩·`env.AI`·`lib/ai/embedding-edge.ts` 추가, 임시 라우트로 한국어 품질·지연 실측 후 삭제. 확정: 모델 `bge-m3`(1024), 버전태그 `bgem3-1024`, 임계값 0.68, qwen3/OpenAI 드롭 (§8).
 - **Phase 1 본작업**: ① `migrations/0005_add_embedding_version.sql`(`embedding_version`+`embedding_v2`, 기존 `embedding` 보존). ② `/api/translate` **인라인 임베딩·P14 조회 제거** → 스트림 종료·`controller.close()` 후 `ctx.waitUntil(recordEdgeEmbedding)`로 bge-m3 임베딩을 `embedding_v2`+버전에 백그라운드 저장(번역 무차단). ③ `/api/similar`·`lib/examples.ts` bge-m3·`embedding_version='bgem3-1024'` 게이팅·임계값 0.68(`embedding_v2 AS embedding`으로 `findSimilarTranslations` 무수정 재사용). ④ `lib/backfill.ts`(`backfillEmbeddingBatch`, 페이지 50, `recordEdgeEmbedding` 재사용·멱등) + 얇은 `app/api/backfill/route.ts`(배치당 1회·`remaining` 반환). ⑤ 유닛 테스트 +9(`recordEdgeEmbedding`·`backfillEmbeddingBatch`·버전/임계값 상수) = 총 96개 통과, `next build`·lint·tsc 통과.
 - **Phase 1의 의도된 트레이드오프:** P14 인라인 few-shot은 잠시 내려놓음(정적 예시로 폴백=무회귀) → **Phase 2 옵트인**으로 부활(결정 ③). 버전 게이팅으로 **백필 전까지 `/api/similar`는 빈 결과**(마이그레이션 중 공간 혼합 방지, 의도됨). 배포 순서: `main` push → **CI deploy 잡이 build→마이그레이션 0005(`--remote`)→worker 배포 자동 수행**(수동 `db:migrate:prod` 불필요) → 이후 `POST /api/backfill` 반복(remaining=0까지) → 유사검색 활성. (로컬 dev만 `db:migrate:local` 수동.)
-- **다음 = Phase 2 상세 설계 1회**(§10: `/api/tm` 계약·TM 패널 UX·`exampleIds` 흐름·W9 캐시키 정합성·표시/주입 컷오프) 후 as-you-type 패널 구현.
+- **Phase 2 상세 설계 완료**([§11](./TM-as-you-type-design.md)): gap 5개 확정 — ① `/api/similar` 재사용(신규 라우트 불필요, 이미 `is_favorite`+`similarity` 반환) ② `TmPanel` UX(디바운스 500ms·즐겨찾기만 예시 체크) ③ `exampleIds` → `fetchExamplesByIds` id 주입(임베딩 0) ④ ⚠️W9 정합성 = `had_examples` 불리언 컬럼(0006)+예시 force-fresh ⑤ 표시·주입 단일 컷오프 0.68. PR 분할: **PR-a 백엔드(무 UI, 무회귀 선행)** → **PR-b 프론트**. **다음 = §11.8 결정 5건 확인 후 PR-a 구현.**
 
 ---
 
