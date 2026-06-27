@@ -89,4 +89,29 @@
 5. **Qwen3-Embedding-0.6B vs bge-m3**(둘 다 $0.012, Qwen3가 MMTEB 더 높음) — 우리 데이터로 A/B 가치.
 
 ## 7. 영향 파일
-`wrangler.toml`(`[ai]`), `lib/ai/embedding-edge.ts`(신규), `migrations/0005_add_embedding_version.sql`(신규), `app/api/translate/route.ts`(인라인 임베딩 제거·`exampleIds` 수용·백그라운드 기록), `app/api/similar/route.ts`(bge-m3·버전게이팅), `app/api/tm/route.ts`(신규), `components/TranslateForm.tsx`(디바운스 조회·TM 패널), `lib/translate-core.ts`(백그라운드 임베딩).
+`wrangler.toml`(`[ai]` ✅ 추가됨), `lib/ai/embedding-edge.ts`(✅ 추가됨, `getEdgeEmbedding`), `migrations/0005_add_embedding_version.sql`(신규), `app/api/translate/route.ts`(인라인 임베딩 제거·`exampleIds` 수용·백그라운드 기록), `app/api/similar/route.ts`(bge-m3·버전게이팅), `app/api/tm/route.ts`(신규), `components/TranslateForm.tsx`(디바운스 조회·TM 패널), `lib/translate-core.ts`(백그라운드 임베딩).
+
+## 8. 스팟체크 결과 & 확정 (2026-06-26, Phase 1 착수 전 검증 완료)
+임시 `/api/embedtest`(삭제됨)로 dev 문장 6개(리뷰 3 + 배포 2 + 무관 1)를 세 모델로 임베딩, 쌍별 코사인·지연 비교:
+
+| 모델 | 강한 패러프레이즈 | 내부 최저 | 외부 최고 | 분리 | 지연(6문장) |
+|---|---|---|---|---|---|
+| **bge-m3** | 0.71·0.74·0.74 | 0.543 | 0.543 | 겹침 | **~254ms** |
+| qwen3-0.6b | 0.57·0.64·0.74 | 0.533 | 0.508 | +0.025 | ~2382ms |
+| OpenAI 3-small | 0.53·0.55·0.65 | 0.463 | 0.299 | +0.164 | ~1337ms |
+
+**확정 결정:**
+- **모델 = `@cf/baai/bge-m3` (1024차원).** 약한 매치는 노이즈와 겹치나 **강한 패러프레이즈가 0.7+로 또렷**, OpenAI 대비 **~5배 빠름**(254 vs 1337ms) — as-you-type 필수.
+- **임계값 = ~0.68.** "특별한·강한 매치만" 발동(=사용자 의도). 이 테스트에서 0.68은 강한 패러프레이즈만 통과(오탐 0), 약한·무관 전부 차단. → 실데이터로 미세조정.
+- **qwen3 드롭**(분리 미미 + 가장 느림), **OpenAI 드롭**(느림 + 제거 대상). 단일 모델.
+- 발견: 현재 코드 임계값(W6 0.85/P14 0.75)은 너무 높아 *실제 패러프레이즈도 거의 안 잡힘* → 0.68로 내려야 작동.
+
+## 9. 다음 세션 시작점 — Phase 1 체크리스트
+이미 완료(커밋됨): `[ai]` 바인딩, `env.AI` 타입, `lib/ai/embedding-edge.ts`(+테스트). 모델·임계값 확정(§8).
+**Phase 1 남은 작업** (확정 파라미터: 모델 `@cf/baai/bge-m3`, 차원 1024, 버전태그 `bgem3-1024`, 임계값 0.68):
+1. `migrations/0005_add_embedding_version.sql` — `embedding_version TEXT`, `embedding_v2 TEXT` 추가(기존 `embedding` 보존).
+2. `app/api/translate/route.ts` — 인라인 임베딩 제거 → 스트림 종료 후 백그라운드로 bge-m3 임베딩을 `embedding_v2`+버전 저장(번역 비차단). **→ 1.3s 블록 제거.**
+3. `app/api/similar/route.ts`·`lib/examples.ts` — bge-m3·`embedding_version='bgem3-1024'` 게이팅, 임계값 0.68.
+4. 기존 코퍼스 백필 스크립트(50~100행 페이지, 작아서 일회성).
+5. 테스트: 버전 게이팅·백그라운드 임베딩 경로(가짜 DB·`env.AI` 모킹).
+> Phase 2(as-you-type 패널)·Phase 3(인-브라우저)는 그 다음.
