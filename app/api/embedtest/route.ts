@@ -29,15 +29,22 @@ export async function POST(request: NextRequest) {
 
   const { env } = await getCloudflareContext();
   const cfEnv = env as CloudflareEnv;
+  const ai = cfEnv.AI as unknown as EmbeddingAI;
 
-  // bge-m3 (edge)
-  const t0 = Date.now();
-  const bge = await Promise.all(
-    texts.map((t) => getEdgeEmbedding(cfEnv.AI as unknown as EmbeddingAI, t))
-  );
-  const bgem3 = { dim: bge[0].length, totalMs: Date.now() - t0, pairs: pairs(texts, bge) };
+  // A/B several edge models to pick the best Korean discriminator.
+  const EDGE_MODELS = ["@cf/baai/bge-m3", "@cf/qwen/qwen3-embedding-0.6b"];
+  const edge: Record<string, unknown> = {};
+  for (const model of EDGE_MODELS) {
+    try {
+      const t0 = Date.now();
+      const vecs = await Promise.all(texts.map((t) => getEdgeEmbedding(ai, t, model)));
+      edge[model] = { dim: vecs[0].length, totalMs: Date.now() - t0, pairs: pairs(texts, vecs) };
+    } catch (e) {
+      edge[model] = { error: e instanceof Error ? e.message : String(e) };
+    }
+  }
 
-  // OpenAI (for side-by-side comparison, if configured)
+  // OpenAI baseline (if configured)
   let openai: { dim: number; totalMs: number; pairs: ReturnType<typeof pairs> } | null = null;
   if (cfEnv.OPENAI_API_KEY) {
     const o0 = Date.now();
@@ -45,5 +52,5 @@ export async function POST(request: NextRequest) {
     openai = { dim: oa[0].length, totalMs: Date.now() - o0, pairs: pairs(texts, oa) };
   }
 
-  return NextResponse.json({ texts, bgem3, openai });
+  return NextResponse.json({ texts, edge, openai });
 }

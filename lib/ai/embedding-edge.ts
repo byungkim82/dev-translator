@@ -12,7 +12,11 @@ export interface EmbeddingAI {
   ): Promise<{ data: number[][] }>;
 }
 
-export async function getEdgeEmbedding(ai: EmbeddingAI, text: string): Promise<number[]> {
-  const result = await ai.run(EDGE_EMBEDDING_MODEL, { text });
+export async function getEdgeEmbedding(
+  ai: EmbeddingAI,
+  text: string,
+  model: string = EDGE_EMBEDDING_MODEL
+): Promise<number[]> {
+  const result = await ai.run(model, { text });
   return result.data[0];
 }
