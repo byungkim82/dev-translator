@@ -1,6 +1,6 @@
 # 설계안 — As-you-type 번역 메모리 (Translation Memory)
 
-> **상태:** Phase 1 완료 · Phase 2 설계 완료(§11) + PR-a 백엔드 구현 완료 · PR-b 프론트 남음
+> **상태:** Phase 1 완료 · Phase 2 구현 완료 (§11: PR-a 백엔드 + PR-b 프론트 as-you-type TM 패널) · 배포·실측 남음 · Phase 3 보류
 > **작성:** 2026-06-26
 > **관련:** P14(개인화 few-shot)·W6(유사 제안)·T16(Vectorize) 를 통합/대체. 임베딩 지연(1.3s) 문제 해결.
 
@@ -199,5 +199,6 @@
 
 ### 11.9 단계 분할 (독립 배포 가능한 PR)
 1. ✅ **PR-a (백엔드, 무 UI 변화) — 구현 완료 2026-06-26.** 0006 마이그레이션(`had_examples`) + `finalizeTranslation` 저장 + `findCachedTranslation` `had_examples=0` 필터 + `fetchExamplesByIds`(id 조회·순서보존·캡) + 라우트 `exampleIds` 수용(없으면 무회귀: 캐시·프롬프트 Phase 1과 동일) + 예시요청 캐시 read 스킵. 유닛 테스트 +6(총 102) · lint·tsc·`next build` 통과. *클라가 아직 `exampleIds`를 안 보내므로 배포해도 동작 동일 — 안전 선행.*
-2. 🔲 **PR-b (프론트) — 남음.** `TranslateForm.onDraftChange` + 디바운스(500ms·≥3자·쿼리캐시·abort) TM 조회 + `SimilarSuggestions`→`TmPanel`(즐겨찾기 예시 체크박스, 매치 있으면 상시 렌더) + `selectedExampleIds`→`exampleIds` 전달 + 컴포넌트 테스트. PR-a 위에서 기능 활성.
-→ PR-a를 먼저 머지하면 클라 없이도 스키마/라우트가 안전하게 준비됨(점진).
+2. ✅ **PR-b (프론트) — 구현 완료 2026-06-29.** `TranslateForm.onDraftChange`(가산) + page 디바운스(500ms·≥3자·쿼리캐시 `Map`·`AbortController`) TM 조회 + `SimilarSuggestions`→`TmPanel`(즐겨찾기만 `예시로 참고` 체크박스·`이걸로 교체`·로딩/빈 상태·매치 있으면 상시 렌더) + `selectedExampleIds`(매치 벗어나면 prune)→유사도순 `exampleIds` 전달. 컴포넌트 테스트 +10(TmPanel 7 + page 3: 디바운스 조회·<3자 게이트·예시 전달) = 총 112 · lint·tsc·`next build` 통과.
+   - **무회귀 유지법:** TM 조회는 디바운스 타이핑 *및* 제출 시(쿼리캐시로 dedup) 둘 다 발동 → paste+즉시 Enter도 W6 제안이 뜸(기존 동작 보존). 기존 W6/자동복사/스트리밍 테스트 전부 통과.
+→ PR-a를 먼저 머지하면 클라 없이도 스키마/라우트가 안전하게 준비됨(점진). 이제 PR-a+PR-b로 as-you-type TM 기능 활성.

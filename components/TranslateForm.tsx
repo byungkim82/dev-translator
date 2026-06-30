@@ -7,6 +7,9 @@ interface TranslateFormProps {
   isLoading: boolean;
   defaultModel?: string;
   defaultStyle?: string;
+  // P16 Phase 2: emit the draft text on every change so the page can run the
+  // debounced as-you-type TM lookup. Optional — omitting it is a no-op.
+  onDraftChange?: (text: string) => void;
 }
 
 const MODELS = [
@@ -26,6 +29,7 @@ export function TranslateForm({
   isLoading,
   defaultModel = "gemini-flash-lite",
   defaultStyle = "casual-work",
+  onDraftChange,
 }: TranslateFormProps) {
   const [koreanText, setKoreanText] = useState("");
   const [model, setModel] = useState(defaultModel);
@@ -89,7 +93,10 @@ export function TranslateForm({
         <label className="block text-sm font-medium mb-2">한국어 입력</label>
         <textarea
           value={koreanText}
-          onChange={(e) => setKoreanText(e.target.value)}
+          onChange={(e) => {
+            setKoreanText(e.target.value);
+            onDraftChange?.(e.target.value);
+          }}
           onKeyDown={handleKeyDown}
           placeholder="번역할 텍스트를 입력하세요... (Enter로 번역, Shift+Enter로 줄바꿈)"
           rows={5}

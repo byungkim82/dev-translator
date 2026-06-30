@@ -2,9 +2,9 @@
 
 import { TranslateForm } from "@/components/TranslateForm";
 import { TranslationResult } from "@/components/TranslationResult";
-import { SimilarSuggestions } from "@/components/SimilarSuggestions";
+import { TmPanel } from "@/components/TmPanel";
 import { Toast } from "@/components/Toast";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   applyStreamEvent,
   createNdjsonParser,
@@ -38,7 +38,11 @@ export default function HomePage() {
   const [result, setResult] = useState<Translation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [similarTranslations, setSimilarTranslations] = useState<SimilarTranslation[]>([]);
+  // P16 Phase 2: as-you-type Translation Memory state.
+  const [draft, setDraft] = useState("");
+  const [tmMatches, setTmMatches] = useState<SimilarTranslation[]>([]);
+  const [tmLoading, setTmLoading] = useState(false);
+  const [selectedExampleIds, setSelectedExampleIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const [settings, setSettings] = useState<Settings>({
     default_model: "gemini-flash-lite",
@@ -46,6 +50,10 @@ export default function HomePage() {
     auto_copy: 0,
   });
   const abortRef = useRef<AbortController | null>(null);
+  const tmAbortRef = useRef<AbortController | null>(null);
+  // Cache TM lookups by query text so re-typing the same text (e.g. backspace +
+  // retype, or submit after a pause) never re-hits the network.
+  const tmCacheRef = useRef<Map<string, SimilarTranslation[]>>(new Map());
 
   const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
     setToast({ message, type });
@@ -79,37 +87,89 @@ export default function HomePage() {
     fetchSettings();
   }, []);
 
+  // Look up similar past translations (TM). Cache-deduped per query text, with an
+  // AbortController so a newer lookup supersedes an in-flight one. Stable (only
+  // refs/setters), so it's safe in the debounce effect's deps.
+  const fetchTm = useCallback(async (text: string) => {
+    const cached = tmCacheRef.current.get(text);
+    if (cached) {
+      setTmMatches(cached);
+      return;
+    }
+    tmAbortRef.current?.abort();
+    const controller = new AbortController();
+    tmAbortRef.current = controller;
+    setTmLoading(true);
+    try {
+      const res = await fetch("/api/similar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+        signal: controller.signal,
+      });
+      if (!res.ok) return;
+      const data = await res.json() as { similar?: SimilarTranslation[] };
+      const matches = data.similar ?? [];
+      tmCacheRef.current.set(text, matches);
+      if (tmAbortRef.current === controller) setTmMatches(matches);
+    } catch (error) {
+      if ((error as Error)?.name === "AbortError") return;
+      console.error("TM lookup error:", error);
+      // Non-blocking: a failure just means no suggestions are shown.
+    } finally {
+      if (tmAbortRef.current === controller) setTmLoading(false);
+    }
+  }, []);
+
+  // As-you-type: 500ms after the user stops typing (min 3 chars), refresh the TM
+  // panel. The query cache makes a re-typed string instant and network-free.
+  useEffect(() => {
+    const text = draft.trim();
+    if (text.length < 3) {
+      setTmMatches([]);
+      return;
+    }
+    const cached = tmCacheRef.current.get(text);
+    if (cached) {
+      setTmMatches(cached);
+      return;
+    }
+    const handle = setTimeout(() => void fetchTm(text), 500);
+    return () => clearTimeout(handle);
+  }, [draft, fetchTm]);
+
+  // Drop selected example ids that are no longer among the current matches (the
+  // draft changed), so a stale selection can't ride along into the next request.
+  useEffect(() => {
+    setSelectedExampleIds((prev) => {
+      if (prev.size === 0) return prev;
+      const present = new Set(tmMatches.map((m) => m.id));
+      const next = new Set([...prev].filter((id) => present.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [tmMatches]);
+
+  const toggleExample = (id: string) => {
+    setSelectedExampleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const handleTranslate = async (koreanText: string, model: string, style: string) => {
     if (!koreanText.trim()) {
       showToast("번역할 텍스트를 입력해주세요", "error");
       return;
     }
 
-    // Clear suggestions from a previous translation, then surface similar past
-    // translations in the background — this never blocks the new translation.
-    setSimilarTranslations([]);
-    void fetchSimilar(koreanText);
+    // Make sure the TM panel reflects the submitted text even on paste + immediate
+    // Enter (before the debounce fired). Cache-deduped, so a prior pause is free.
+    void fetchTm(koreanText.trim());
 
-    // Translate right away.
+    // Translate right away — the lookup never blocks it.
     await executeTranslation(koreanText, model, style);
-  };
-
-  const fetchSimilar = async (koreanText: string) => {
-    try {
-      const res = await fetch("/api/similar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: koreanText }),
-      });
-      if (!res.ok) return;
-      const data = await res.json() as { similar?: SimilarTranslation[] };
-      if (data.similar && data.similar.length > 0) {
-        setSimilarTranslations(data.similar);
-      }
-    } catch (error) {
-      console.error("Similar search error:", error);
-      // Non-blocking: a failure just means no suggestions are shown.
-    }
   };
 
   // Build a (possibly partial) Translation from the accumulated stream state.
@@ -150,11 +210,15 @@ export default function HomePage() {
     // Clear the previous translation so its text doesn't linger under the
     // streaming cursor while the first token of the new one is on its way.
     setResult(null);
+    // P16 Phase 2: opt-in TM examples, in similarity order (strongest first).
+    const exampleIds = tmMatches
+      .filter((m) => selectedExampleIds.has(m.id))
+      .map((m) => m.id);
     try {
       const res = await fetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ koreanText, model, style }),
+        body: JSON.stringify({ koreanText, model, style, exampleIds }),
         signal: controller.signal,
       });
 
@@ -258,6 +322,15 @@ export default function HomePage() {
         isLoading={isLoading}
         defaultModel={settings.default_model}
         defaultStyle={settings.default_style}
+        onDraftChange={setDraft}
+      />
+
+      <TmPanel
+        matches={tmMatches}
+        selectedIds={selectedExampleIds}
+        loading={tmLoading}
+        onToggleExample={toggleExample}
+        onUseSimilar={handleUseSimilar}
       />
 
       {result && (
@@ -266,13 +339,6 @@ export default function HomePage() {
           streaming={isStreaming}
           onCopy={handleCopy}
           onToggleFavorite={handleToggleFavorite}
-        />
-      )}
-
-      {result && (
-        <SimilarSuggestions
-          translations={similarTranslations}
-          onUseSimilar={handleUseSimilar}
         />
       )}
 

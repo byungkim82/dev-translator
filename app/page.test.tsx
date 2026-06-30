@@ -182,6 +182,77 @@ describe("HomePage similar suggestions (W6)", () => {
   });
 });
 
+describe("HomePage as-you-type TM (P16 Phase 2)", () => {
+  const SIMILAR_FAV = { ...SIMILAR, id: "s1", is_favorite: true };
+
+  function mockTm() {
+    return vi.fn(async (url: string) => {
+      if (url === "/api/settings") {
+        return jsonResponse({
+          settings: { default_model: "gemini-flash-lite", default_style: "casual-work", auto_copy: 0 },
+        });
+      }
+      if (url === "/api/similar") return jsonResponse({ similar: [SIMILAR_FAV] });
+      if (url === "/api/translate") return jsonResponse(TRANSLATION);
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+  }
+
+  it("looks up similar translations while typing, without translating", async () => {
+    const fetchMock = mockTm();
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<HomePage />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/settings"));
+
+    // No Enter — the panel appears purely from typing (after the ~500ms debounce).
+    await user.type(screen.getByPlaceholderText(/번역할 텍스트/), "이 코드 봐줄래");
+    await screen.findByText("Can you take a look at this code?");
+    expect(fetchMock.mock.calls.some((c) => c[0] === "/api/translate")).toBe(false);
+  });
+
+  it("skips the lookup for input under 3 characters", async () => {
+    const fetchMock = mockTm();
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<HomePage />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/settings"));
+
+    await user.type(screen.getByPlaceholderText(/번역할 텍스트/), "ab");
+    await new Promise((r) => setTimeout(r, 600)); // past the debounce window
+    expect(fetchMock.mock.calls.some((c) => c[0] === "/api/similar")).toBe(false);
+  });
+
+  it("sends opt-in example ids on the next translation", async () => {
+    const fetchMock = mockTm();
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    render(<HomePage />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/settings"));
+
+    const textarea = screen.getByPlaceholderText(/번역할 텍스트/);
+    await user.type(textarea, "이 코드 봐줄래");
+    await user.keyboard("{Enter}");
+    // The favorited match surfaces with an example checkbox; opt it in.
+    await screen.findByText("Can you take a look at this code?");
+    await user.click(screen.getByRole("checkbox"));
+    // Re-translate (refocus the textarea first — the checkbox stole focus); the
+    // selected id rides along in the request body.
+    await user.click(textarea);
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls as unknown as Array<[string, RequestInit?]>;
+      const translateCalls = calls.filter((c) => c[0] === "/api/translate");
+      expect(translateCalls.length).toBeGreaterThanOrEqual(2);
+      const init = translateCalls.at(-1)![1] as RequestInit;
+      const body = JSON.parse(init.body as string);
+      expect(body.exampleIds).toEqual(["s1"]);
+    });
+  });
+});
+
 describe("HomePage truncation warning", () => {
   it("warns when the translation was truncated at the output-token cap", async () => {
     vi.stubGlobal(
