@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCategorizationPrompt,
   buildGlossaryLine,
+  buildReadingPrompt,
   buildTranslationPrompt,
   CATEGORIES,
   CODE_PRESERVATION_RULE,
@@ -89,6 +90,27 @@ describe("buildTranslationPrompt", () => {
   it("omits the examples block when none are given", () => {
     const prompt = buildTranslationPrompt("리뷰 부탁해", "casual-work");
     expect(prompt).not.toContain("match this voice");
+  });
+});
+
+describe("buildReadingPrompt (F11 reading mode)", () => {
+  it("substitutes the English text into the prompt", () => {
+    const prompt = buildReadingPrompt("Can you take a look at this PR?");
+    expect(prompt).toContain("English: Can you take a look at this PR?");
+  });
+
+  it("asks for Korean-only output", () => {
+    expect(buildReadingPrompt("hi")).toContain("Respond with ONLY the Korean translation");
+  });
+
+  it("instructs to keep English technical terms in English (reverse code preservation)", () => {
+    expect(buildReadingPrompt("we will deploy")).toContain("Keep English technical terms");
+  });
+
+  it("has no work-style variants (single prompt)", () => {
+    // Sanity: the reading prompt must not carry the KO→EN style scaffolding.
+    const prompt = buildReadingPrompt("test");
+    expect(prompt).not.toContain("casual but professional English");
   });
 });
 

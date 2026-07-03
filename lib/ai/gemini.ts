@@ -36,6 +36,11 @@ const STYLE_TEMPERATURES: Record<string, number> = {
   "formal-work": 0.2,
   "casual-work": 0.3,
   "very-casual": 0.4,
+  // F11: EN→KO reading mode. A dedicated key (not overloading a style key) so its
+  // temperature is tuned independently. 0.3 favors natural readable Korean, which
+  // fits the reading prompt's "natural, not stiff" goal (faithfulness comes from
+  // the prompt instruction, not from suppressing temperature).
+  reading: 0.3,
 };
 
 export async function callGemini(
