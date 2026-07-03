@@ -140,7 +140,11 @@ B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣
 워크플로우의 나머지 절반. 들어오는 영어 Slack 메시지를 빠르게 이해. 현재 단방향이라 절반만 커버.
 **📐 설계안:** [`docs/F11-reading-mode-design.md`](./F11-reading-mode-design.md) — rev3(리뷰 2회 반영). 핵심 결정: **읽기 모드는 일회성(ephemeral)** — DB 저장·캐시·TM·임베딩·스키마 무접촉이라 방향 오염(P16 트랩)·컬럼 반전을 원천 차단. 역방향은 **스타일 없는 단일 프롬프트** + **별도 `/api/read`**(기존 라우트 무접촉 = KO→EN 무회귀). 결정 A~G 사인오프 완료.
 **관련 코드:** `lib/prompts.ts`(`buildReadingPrompt`), `lib/ai/gemini.ts`(온도 키), `app/api/read/route.ts`(신규), `components/TranslateForm.tsx`(방향 토글), `app/page.tsx`(라우팅·direction 렌더).
-**진행 상황:** 🚧 **PR-a(백엔드) 구현 중** — `buildReadingPrompt` + `/api/read`(무 UI·무회귀 선행) → 이후 **PR-b(프론트)** 방향 토글·direction-aware 렌더.
+**진행 상황:** 🚧 **PR-a·PR-b 코드 완료** (배포·수동 E2E 남음).
+- **PR-a(백엔드)**: `buildReadingPrompt`(스타일 없는 단일 프롬프트, 영어 기술용어 보존) + `STYLE_TEMPERATURES` `reading=0.3`(순수 additive) + `app/api/read/route.ts`(일회성 스트리밍 — 캐시·persist·임베딩·examples 전부 없음). 무 UI·무회귀 선행.
+- **PR-b(프론트)**: `TranslateForm` 방향 토글(기본 한→영, 읽기 시 스타일 숨김·모델 유지·`koreanText`→`inputText`) + `page` direction 상태·`/api/read` 라우팅·TM 게이팅(읽기 미발동)·**방향 전환 시 본 번역 abort** + `TranslationResult` direction-aware(라벨/출력, 읽기 id="" → 즐겨찾기 비활성). auto_copy는 한→영에서만.
+- **테스트:** 총 **131 통과**(신규 15: TranslateForm 5·TranslationResult 6·page 읽기 3·direction-toggle abort 1). abort 회귀 테스트는 **mock body를 signal에 배선 + 라벨 부재 단언**으로 비공허성 확보 — fix 제거 시 실패 확인. lint·tsc·`next build`(+OpenNext, `/api/read` 등록) 통과.
+- **남음:** 배포 후 수동 E2E(설계 §9) — 실 스트리밍·기술용어 영어 보존·TM 미표시·즐겨찾기 비활성·한→영 되돌림 무회귀.
 
 ### F12 · "내 영어 다듬기" 모드 — 🟢 M
 직접 쓴 어색한 영어를 번역이 아니라 교정 + 뉘앙스 피드백(학습 효과).

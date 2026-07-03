@@ -22,6 +22,8 @@ export interface Translation {
   is_favorite: boolean;
   created_at: string;
   truncated?: boolean;
+  // F11: translation direction. undefined => ko-en (backward compatible).
+  direction?: "ko-en" | "en-ko";
 }
 
 export interface SimilarTranslation extends Translation {
@@ -38,6 +40,8 @@ export default function HomePage() {
   const [result, setResult] = useState<Translation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  // F11: reading-mode direction (ko-en = KO→EN writing, en-ko = EN→KO reading).
+  const [direction, setDirection] = useState<"ko-en" | "en-ko">("ko-en");
   // P16 Phase 2: as-you-type Translation Memory state.
   const [draft, setDraft] = useState("");
   const [tmMatches, setTmMatches] = useState<SimilarTranslation[]>([]);
@@ -124,6 +128,12 @@ export default function HomePage() {
   // As-you-type: 500ms after the user stops typing (min 3 chars), refresh the TM
   // panel. The query cache makes a re-typed string instant and network-free.
   useEffect(() => {
+    // F11: TM is KO→EN only — reading mode (English input) has no personalized
+    // corpus, so skip the lookup entirely.
+    if (direction !== "ko-en") {
+      setTmMatches([]);
+      return;
+    }
     const text = draft.trim();
     if (text.length < 3) {
       setTmMatches([]);
@@ -136,7 +146,7 @@ export default function HomePage() {
     }
     const handle = setTimeout(() => void fetchTm(text), 500);
     return () => clearTimeout(handle);
-  }, [draft, fetchTm]);
+  }, [draft, direction, fetchTm]);
 
   // Drop selected example ids that are no longer among the current matches (the
   // draft changed), so a stale selection can't ride along into the next request.
@@ -158,48 +168,88 @@ export default function HomePage() {
     });
   };
 
-  const handleTranslate = async (koreanText: string, model: string, style: string) => {
-    if (!koreanText.trim()) {
+  // F11: switch translation direction. Clears the result + all TM state, and
+  // aborts BOTH the in-flight TM lookup AND the live translation stream. Aborting
+  // the translation is required: otherwise the running reader loop keeps calling
+  // setResult with the OLD direction, leaving the label/result inconsistent with
+  // the new toggle (and, with auto_copy, copying English on a reading switch).
+  const handleDirectionChange = (d: "ko-en" | "en-ko") => {
+    setDirection(d);
+    setResult(null);
+    setTmMatches([]);
+    setSelectedExampleIds(new Set());
+    tmAbortRef.current?.abort();
+    abortRef.current?.abort();
+  };
+
+  const handleTranslate = async (text: string, model: string, style: string) => {
+    if (!text.trim()) {
       showToast("번역할 텍스트를 입력해주세요", "error");
       return;
     }
 
-    // Make sure the TM panel reflects the submitted text even on paste + immediate
-    // Enter (before the debounce fired). Cache-deduped, so a prior pause is free.
-    void fetchTm(koreanText.trim());
+    // TM only applies to KO→EN (reading mode has no personalized corpus). Cache-
+    // deduped, so this stays free even on paste + immediate Enter after a pause.
+    if (direction === "ko-en") void fetchTm(text.trim());
 
     // Translate right away — the lookup never blocks it.
-    await executeTranslation(koreanText, model, style);
+    await executeTranslation(text, model, style, direction);
   };
 
   // Build a (possibly partial) Translation from the accumulated stream state.
   const buildStreamResult = (
     state: StreamState,
-    fb: { koreanText: string; model: string; style: string }
-  ): Translation => ({
-    id: state.done?.id ?? "",
-    korean_text: state.meta?.korean_text ?? fb.koreanText,
-    english_text: state.text,
-    model: state.meta?.model ?? fb.model,
-    style: state.meta?.style ?? fb.style,
-    is_favorite: false,
-    created_at: state.done?.created_at ?? "",
-    truncated: state.done?.truncated,
-  });
+    fb: { text: string; model: string; style: string; direction: "ko-en" | "en-ko" }
+  ): Translation => {
+    // Accumulated deltas while streaming; server-cleaned output after `done`.
+    const output = state.text;
+    if (fb.direction === "en-ko") {
+      return {
+        id: state.done?.id ?? "", // reading: always "" (ephemeral, no DB row)
+        korean_text: output, // Korean OUTPUT (invariant: korean_text = the Korean side)
+        english_text: fb.text, // English INPUT
+        model: state.meta?.model ?? fb.model,
+        style: "reading",
+        is_favorite: false,
+        created_at: state.done?.created_at ?? "",
+        truncated: state.done?.truncated,
+        direction: "en-ko",
+      };
+    }
+    return {
+      id: state.done?.id ?? "",
+      korean_text: state.meta?.korean_text ?? fb.text, // Korean INPUT
+      english_text: output, // English OUTPUT
+      model: state.meta?.model ?? fb.model,
+      style: state.meta?.style ?? fb.style,
+      is_favorite: false,
+      created_at: state.done?.created_at ?? "",
+      truncated: state.done?.truncated,
+      direction: "ko-en",
+    };
+  };
 
   // Side effects shared by the streamed and cache-hit (JSON) completion paths.
-  const afterComplete = async (translation: Translation) => {
-    if (settings.auto_copy) {
+  const afterComplete = async (translation: Translation, dir: "ko-en" | "en-ko") => {
+    // Auto-copy only for KO→EN (reading output isn't something you paste to Slack).
+    // autoCopy shows its own success/failure toast.
+    const autoCopied = dir === "ko-en" && Boolean(settings.auto_copy);
+    if (autoCopied) {
       await autoCopy(translation.english_text);
     }
     if (translation.truncated) {
       showToast("⚠️ 결과가 잘렸을 수 있습니다 (출력 길이 한도 초과)", "error");
-    } else if (!settings.auto_copy) {
+    } else if (!autoCopied) {
       showToast("번역이 완료되었습니다", "success");
     }
   };
 
-  const executeTranslation = async (koreanText: string, model: string, style: string) => {
+  const executeTranslation = async (
+    text: string,
+    model: string,
+    style: string,
+    dir: "ko-en" | "en-ko"
+  ) => {
     // Cancel any in-flight translation before starting a new one.
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -210,26 +260,34 @@ export default function HomePage() {
     // Clear the previous translation so its text doesn't linger under the
     // streaming cursor while the first token of the new one is on its way.
     setResult(null);
-    // P16 Phase 2: opt-in TM examples, in similarity order (strongest first).
-    const exampleIds = tmMatches
-      .filter((m) => selectedExampleIds.has(m.id))
-      .map((m) => m.id);
+
+    const isReading = dir === "en-ko";
+    const url = isReading ? "/api/read" : "/api/translate";
+    // Reading has no examples; KO→EN sends opt-in TM examples (strongest first).
+    const exampleIds = isReading
+      ? []
+      : tmMatches.filter((m) => selectedExampleIds.has(m.id)).map((m) => m.id);
+    const body = isReading
+      ? JSON.stringify({ englishText: text, model })
+      : JSON.stringify({ koreanText: text, model, style, exampleIds });
     try {
-      const res = await fetch("/api/translate", {
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ koreanText, model, style, exampleIds }),
+        body,
         signal: controller.signal,
       });
 
       const contentType = res.headers.get("content-type") ?? "";
 
-      // Cache hit or a pre-stream error comes back as plain JSON.
+      // Cache hit (KO→EN) or a pre-stream error comes back as plain JSON. Reading
+      // success is always a stream, so JSON there only ever means an error.
       if (contentType.includes("application/json")) {
         const data = await res.json() as Translation & { error?: string };
         if (!res.ok) throw new Error(data.error || "Translation failed");
-        setResult(data);
-        await afterComplete(data);
+        const final = { ...data, direction: dir };
+        setResult(final);
+        await afterComplete(final, dir);
         return;
       }
 
@@ -239,7 +297,7 @@ export default function HomePage() {
       const decoder = new TextDecoder();
       const parser = createNdjsonParser();
       let state = initialStreamState();
-      const fb = { koreanText, model, style };
+      const fb = { text, model, style, direction: dir };
 
       setIsStreaming(true);
       for (;;) {
@@ -259,7 +317,7 @@ export default function HomePage() {
       if (state.done) {
         const final = buildStreamResult(state, fb);
         setResult(final);
-        await afterComplete(final);
+        await afterComplete(final, dir);
       } else {
         showToast("응답이 중단되었습니다", "error");
       }
@@ -282,6 +340,7 @@ export default function HomePage() {
     setResult({
       ...translation,
       is_favorite: Boolean(translation.is_favorite),
+      direction: "ko-en", // similar suggestions only surface in KO→EN mode
     });
     if (settings.auto_copy) {
       void autoCopy(translation.english_text);
@@ -323,15 +382,19 @@ export default function HomePage() {
         defaultModel={settings.default_model}
         defaultStyle={settings.default_style}
         onDraftChange={setDraft}
+        direction={direction}
+        onDirectionChange={handleDirectionChange}
       />
 
-      <TmPanel
-        matches={tmMatches}
-        selectedIds={selectedExampleIds}
-        loading={tmLoading}
-        onToggleExample={toggleExample}
-        onUseSimilar={handleUseSimilar}
-      />
+      {direction === "ko-en" && (
+        <TmPanel
+          matches={tmMatches}
+          selectedIds={selectedExampleIds}
+          loading={tmLoading}
+          onToggleExample={toggleExample}
+          onUseSimilar={handleUseSimilar}
+        />
+      )}
 
       {result && (
         <TranslationResult
