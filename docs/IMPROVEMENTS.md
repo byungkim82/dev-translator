@@ -41,7 +41,7 @@
 | F13 | 자주 쓰는 템플릿/스니펫 | 기능 | 🟢 | M | 🔲 |
 | P14 | 내 과거 번역을 few-shot으로 재활용 | 개인화 | 🔴 | L | ✅ |
 | P15 | 인라인 편집 + 교정 학습 | 개인화 | 🟡 | M | 🔲 |
-| P16 | As-you-type 번역 메모리 (bge-m3 + 옵트인 few-shot; P14/W6 통합) | 개인화 | 🔴 | L | 🚧 |
+| P16 | As-you-type 번역 메모리 (bge-m3 + 옵트인 few-shot; P14/W6 통합) | 개인화 | 🔴 | L | ✅ |
 | T16 | 유사 검색을 Cloudflare Vectorize로 이전 | 기술 | 🟡 | L | 🔲 |
 | T17 | Gemini 호출 타임아웃/재시도 | 기술 | 🟡 | S | 🔲 |
 | T18 | 테스트 기반 구축 (Vitest + 순수 함수 유닛 테스트) | 기술 | 🟡 | M | ✅ |
@@ -167,11 +167,12 @@ B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣
 입력하는 동안(디바운스) 즐겨찾기 코퍼스에서 비슷한 과거 번역을 찾아 보여주고, 강한 매치는 **옵트인으로 few-shot 주입**. 번역은 임베딩에 안 막힘, 임베딩은 백그라운드 기록. 전문 번역 도구의 **Translation Memory** 패턴 + LLM few-shot + 엣지 임베딩. **P14(항상 발동) 대체 · W6 흡수 · T16 동기 대체**.
 **📐 설계안:** [`docs/TM-as-you-type-design.md`](./TM-as-you-type-design.md) — 리서치 기반. 핵심 판정: **bge-m3(Workers AI 엣지)가 한국어에서 OpenAI보다 우수+저렴**(MIRACL-Ko 69.9 vs 63.9), 타이핑-중은 멈춤-디바운스(~500ms), 단일사용자라 프라이버시 무이슈(OpenAI 제거가 이득). 단계: **P1**(bge-m3 전환+임베딩 핫패스 분리=지연 해결) → **P2**(as-you-type 패널) → **P3**(선택: 인-브라우저). **미결정 5건**(전환/시작점/P14 처리 등).
 **관련 코드:** `wrangler.toml`(`[ai]`), `lib/ai/embedding-edge.ts`·`app/api/tm/route.ts`(신규), `app/api/translate/route.ts`·`app/api/similar/route.ts`, `components/TranslateForm.tsx`, `migrations/0005_*`.
-**진행 상황:** 🚧 **Phase 1 완료(임베딩 핫패스 분리)** — bge-m3로 전환 + 번역 핫패스에서 임베딩 제거 = **~1.3s 블록 해소**.
+**진행 상황:** ✅ **Phase 1·2 완료 + 프로덕션 배포·QA 통과 (2026-06-30)** — bge-m3 전환 + 핫패스 임베딩 제거(~1.3s 블록 해소) + as-you-type TM 패널 + 옵트인 few-shot. Phase 3(인-브라우저)는 의도적 보류.
 - **Phase 1a(스팟체크)**: `[ai]` 바인딩·`env.AI`·`lib/ai/embedding-edge.ts` 추가, 임시 라우트로 한국어 품질·지연 실측 후 삭제. 확정: 모델 `bge-m3`(1024), 버전태그 `bgem3-1024`, 임계값 0.68, qwen3/OpenAI 드롭 (§8).
 - **Phase 1 본작업**: ① `migrations/0005_add_embedding_version.sql`(`embedding_version`+`embedding_v2`, 기존 `embedding` 보존). ② `/api/translate` **인라인 임베딩·P14 조회 제거** → 스트림 종료·`controller.close()` 후 `ctx.waitUntil(recordEdgeEmbedding)`로 bge-m3 임베딩을 `embedding_v2`+버전에 백그라운드 저장(번역 무차단). ③ `/api/similar`·`lib/examples.ts` bge-m3·`embedding_version='bgem3-1024'` 게이팅·임계값 0.68(`embedding_v2 AS embedding`으로 `findSimilarTranslations` 무수정 재사용). ④ `lib/backfill.ts`(`backfillEmbeddingBatch`, 페이지 50, `recordEdgeEmbedding` 재사용·멱등) + 얇은 `app/api/backfill/route.ts`(배치당 1회·`remaining` 반환). ⑤ 유닛 테스트 +9(`recordEdgeEmbedding`·`backfillEmbeddingBatch`·버전/임계값 상수) = 총 96개 통과, `next build`·lint·tsc 통과.
 - **Phase 1의 의도된 트레이드오프:** P14 인라인 few-shot은 잠시 내려놓음(정적 예시로 폴백=무회귀) → **Phase 2 옵트인**으로 부활(결정 ③). 버전 게이팅으로 **백필 전까지 `/api/similar`는 빈 결과**(마이그레이션 중 공간 혼합 방지, 의도됨). 배포 순서: `main` push → **CI deploy 잡이 build→마이그레이션 0005(`--remote`)→worker 배포 자동 수행**(수동 `db:migrate:prod` 불필요) → 이후 `POST /api/backfill` 반복(remaining=0까지) → 유사검색 활성. (로컬 dev만 `db:migrate:local` 수동.)
-- **Phase 2 상세 설계 완료**([§11](./TM-as-you-type-design.md)): gap 5개 확정 — ① `/api/similar` 재사용(신규 라우트 불필요, 이미 `is_favorite`+`similarity` 반환) ② `TmPanel` UX(디바운스 500ms·즐겨찾기만 예시 체크) ③ `exampleIds` → `fetchExamplesByIds` id 주입(임베딩 0) ④ ⚠️W9 정합성 = `had_examples` 불리언 컬럼(0006)+예시 force-fresh ⑤ 표시·주입 단일 컷오프 0.68. PR 분할: **PR-a 백엔드(무 UI, 무회귀 선행)** → **PR-b 프론트**. 결정 A~E 사인오프(§11.8). ✅ **PR-a(백엔드) 구현 완료** — 0006 마이그레이션(`had_examples`) + `findCachedTranslation` `had_examples=0` 필터 + `fetchExamplesByIds`(id 주입, 임베딩 0) + 라우트 `exampleIds` 수용(없으면 무회귀)·예시요청 캐시 스킵. ✅ **PR-b(프론트) 구현 완료** — `TranslateForm.onDraftChange` + page 디바운스(500ms·≥3자·쿼리캐시·abort) TM 조회 + `SimilarSuggestions`→`TmPanel`(즐겨찾기 예시 체크박스·로딩/빈 상태) + 유사도순 `exampleIds` 전달. TM 조회는 타이핑·제출 양쪽 발동(캐시 dedup)이라 W6 무회귀. 테스트 총 112 · lint·tsc·`next build` 통과. **다음 = 배포 + 실측**(0.68 체감·예시 효과). Phase 3(인-브라우저)는 보류.
+- **Phase 2 상세 설계 완료**([§11](./TM-as-you-type-design.md)): gap 5개 확정 — ① `/api/similar` 재사용(신규 라우트 불필요, 이미 `is_favorite`+`similarity` 반환) ② `TmPanel` UX(디바운스 500ms·즐겨찾기만 예시 체크) ③ `exampleIds` → `fetchExamplesByIds` id 주입(임베딩 0) ④ ⚠️W9 정합성 = `had_examples` 불리언 컬럼(0006)+예시 force-fresh ⑤ 표시·주입 단일 컷오프 0.68. PR 분할: **PR-a 백엔드(무 UI, 무회귀 선행)** → **PR-b 프론트**. 결정 A~E 사인오프(§11.8). ✅ **PR-a(백엔드) 구현 완료** — 0006 마이그레이션(`had_examples`) + `findCachedTranslation` `had_examples=0` 필터 + `fetchExamplesByIds`(id 주입, 임베딩 0) + 라우트 `exampleIds` 수용(없으면 무회귀)·예시요청 캐시 스킵. ✅ **PR-b(프론트) 구현 완료** — `TranslateForm.onDraftChange` + page 디바운스(500ms·≥3자·쿼리캐시·abort) TM 조회 + `SimilarSuggestions`→`TmPanel`(즐겨찾기 예시 체크박스·로딩/빈 상태) + 유사도순 `exampleIds` 전달. TM 조회는 타이핑·제출 양쪽 발동(캐시 dedup)이라 W6 무회귀. 테스트 총 112 · lint·tsc·`next build` 통과.
+- ✅ **배포 + 프로덕션 QA 통과 (2026-06-30)** — 자동테스트로 못 잡는 **런타임 전용 위험 항목 2개 검증**: **A2 백그라운드 임베딩**(`ctx.waitUntil`이 실 Workers에서 bge-m3 벡터를 `embedding_v2`+버전에 기록) · **C 캐시 정합성 트랩**(plain→예시→plain 시 정확히 2행[plain 1+예시 1], 예시본이 plain 캐시 오염 안 함 = `had_examples` 격리 검증). 부수 검증: A1 첫 토큰 즉시(1.3s 블록 해소), B1 as-you-type 패널(강한 패러프레이즈 **83% 매치**, 컷오프 0.68 대비 여유 0.15), B3 즐겨찾기만 예시 체크박스, B4 `exampleIds` 전송. **컷오프 0.68은 실사용 며칠 후 오탐 빈도로 최종 조정**(`EDGE_SIMILARITY_THRESHOLD` 한 곳). Phase 3(인-브라우저)는 보류.
 
 ---
 
@@ -227,3 +228,4 @@ B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣
 | W6 | 유사 검색 논블로킹 (모달 → 결과 아래 제안 카드) | 2026-06-26 | `7a9114a` |
 | Q6 | 출력 상한 8192 + 잘림 감지 경고 | 2026-06-26 | `2f51fd8` |
 | W7 | 번역 결과 스트리밍 (NDJSON, 4단계) — 배포 후 E2E 수동 검증 권장 | 2026-06-26 | `25cf22c`·`732fabf`·`4508678` |
+| P16 | As-you-type 번역 메모리 (bge-m3 핫패스 분리 + 옵트인 few-shot TM 패널; Phase 3 보류) — 배포·프로덕션 QA 통과 | 2026-06-30 | `200e837`·`a02ba5b`·`4e14613`·`9d138f1` |
