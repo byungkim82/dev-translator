@@ -135,6 +135,25 @@ export function buildTranslationPrompt(
   );
 }
 
+// F11: reverse direction (English → Korean, reading mode). A SINGLE prompt with
+// NO style variants — reading mode is about fast comprehension, not outgoing tone.
+// Kept fully separate from buildTranslationPrompt so the KO→EN path is byte-for-
+// byte unchanged (no-regression). Mirrors CODE_PRESERVATION_RULE in reverse: keep
+// English tech terms in English (a Korean dev reads "deploy" faster than "배포").
+// Direct interpolation (not a {INPUT} placeholder) avoids a silent no-substitution
+// bug on a single prompt.
+export function buildReadingPrompt(englishText: string): string {
+  return `Translate the following English message (from a US tech company Slack, PR, or issue) into natural, clear Korean that a Korean developer can understand at a glance. Focus on:
+- Fast comprehension over polish — natural Korean a developer actually uses, not stiff textbook Korean
+- Faithful meaning AND intent (is it a request, a heads-up, a question, an FYI?)
+- Keep English technical terms, code identifiers, commands, file names, and product names in English (deploy, merge, rebase, staging, PR, rollback, standup, function/variable names). A Korean dev reads these faster in English than force-translated.
+- Preserve any code or inline snippets verbatim
+
+English: ${englishText}
+
+Respond with ONLY the Korean translation, no explanations.`;
+}
+
 export const CATEGORIES = [
   "Code Review",
   "Bug Report",

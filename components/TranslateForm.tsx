@@ -3,13 +3,18 @@
 import { useState, useEffect } from "react";
 
 interface TranslateFormProps {
-  onTranslate: (koreanText: string, model: string, style: string) => Promise<void>;
+  // First arg is the input text (Korean for ko-en, English for en-ko reading).
+  onTranslate: (text: string, model: string, style: string) => Promise<void>;
   isLoading: boolean;
   defaultModel?: string;
   defaultStyle?: string;
   // P16 Phase 2: emit the draft text on every change so the page can run the
   // debounced as-you-type TM lookup. Optional — omitting it is a no-op.
   onDraftChange?: (text: string) => void;
+  // F11: reading-mode direction, controlled by the page. Optional (defaults to
+  // ko-en) so omitting both props keeps the exact pre-F11 behavior (no-regression).
+  direction?: "ko-en" | "en-ko";
+  onDirectionChange?: (d: "ko-en" | "en-ko") => void;
 }
 
 const MODELS = [
@@ -30,10 +35,14 @@ export function TranslateForm({
   defaultModel = "gemini-flash-lite",
   defaultStyle = "casual-work",
   onDraftChange,
+  direction = "ko-en",
+  onDirectionChange,
 }: TranslateFormProps) {
-  const [koreanText, setKoreanText] = useState("");
+  const [inputText, setInputText] = useState("");
   const [model, setModel] = useState(defaultModel);
   const [style, setStyle] = useState(defaultStyle);
+
+  const isReading = direction === "en-ko";
 
   // Update state when default props change
   useEffect(() => {
@@ -44,21 +53,56 @@ export function TranslateForm({
     setStyle(defaultStyle);
   }, [defaultStyle]);
 
+  // F11: switching direction clears the local input (KO input vs EN input are
+  // unrelated) and notifies the page (which clears result/TM state + aborts).
+  const handleDirectionChange = (d: "ko-en" | "en-ko") => {
+    if (d === direction) return;
+    setInputText("");
+    onDraftChange?.("");
+    onDirectionChange?.(d);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onTranslate(koreanText, model, style);
+    await onTranslate(inputText, model, style);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      onTranslate(koreanText, model, style);
+      onTranslate(inputText, model, style);
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-lg p-6 shadow-sm space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+      {/* F11: translation direction toggle */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => handleDirectionChange("ko-en")}
+          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+            !isReading
+              ? "bg-gradient-primary text-white shadow-md"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          한국어 → 영어
+        </button>
+        <button
+          type="button"
+          onClick={() => handleDirectionChange("en-ko")}
+          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+            isReading
+              ? "bg-gradient-primary text-white shadow-md"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          영어 → 한국어
+        </button>
+      </div>
+
+      <div className={isReading ? "" : "grid grid-cols-2 gap-4"}>
         <div>
           <label className="block text-sm font-medium mb-2">모델</label>
           <select
@@ -73,32 +117,41 @@ export function TranslateForm({
             ))}
           </select>
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-2">스타일</label>
-          <select
-            value={style}
-            onChange={(e) => setStyle(e.target.value)}
-            className="w-full p-3 border border-gray-200 rounded-md focus:outline-none focus:border-primary"
-          >
-            {STYLES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Reading mode is style-less (comprehension, not outgoing tone). */}
+        {!isReading && (
+          <div>
+            <label className="block text-sm font-medium mb-2">스타일</label>
+            <select
+              value={style}
+              onChange={(e) => setStyle(e.target.value)}
+              className="w-full p-3 border border-gray-200 rounded-md focus:outline-none focus:border-primary"
+            >
+              {STYLES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">한국어 입력</label>
+        <label className="block text-sm font-medium mb-2">
+          {isReading ? "영어 입력" : "한국어 입력"}
+        </label>
         <textarea
-          value={koreanText}
+          value={inputText}
           onChange={(e) => {
-            setKoreanText(e.target.value);
+            setInputText(e.target.value);
             onDraftChange?.(e.target.value);
           }}
           onKeyDown={handleKeyDown}
-          placeholder="번역할 텍스트를 입력하세요... (Enter로 번역, Shift+Enter로 줄바꿈)"
+          placeholder={
+            isReading
+              ? "이해할 영어 메시지를 붙여넣으세요... (Enter로 번역, Shift+Enter로 줄바꿈)"
+              : "번역할 텍스트를 입력하세요... (Enter로 번역, Shift+Enter로 줄바꿈)"
+          }
           rows={5}
           className="w-full p-3 border border-gray-200 rounded-md resize-y focus:outline-none focus:border-primary"
         />
@@ -106,7 +159,7 @@ export function TranslateForm({
 
       <button
         type="submit"
-        disabled={isLoading || !koreanText.trim()}
+        disabled={isLoading || !inputText.trim()}
         className="w-full py-3 px-6 bg-gradient-primary text-white font-medium rounded-md hover:opacity-90 shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
       >
         {isLoading ? (
