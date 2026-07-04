@@ -22,11 +22,12 @@ describe("TranslateForm direction toggle (F11)", () => {
     expect(screen.getByText("캐주얼 업무용")).toBeTruthy();
   });
 
-  it("in reading mode (en-ko): hides the style selector, keeps model, shows English input label", () => {
+  it("in reading mode (en-ko): hides both model and style selectors, shows English input label", () => {
     render(<TranslateForm onTranslate={noopTranslate} isLoading={false} direction="en-ko" />);
     expect(screen.getByText("영어 입력")).toBeTruthy();
     expect(screen.queryByText("캐주얼 업무용")).toBeNull(); // style selector gone
-    expect(screen.getByText("Gemini 3.1 Flash Lite (추천)")).toBeTruthy(); // model stays
+    // Model selector hidden too — reading is locked to the cheap default model.
+    expect(screen.queryByText("Gemini 3.1 Flash Lite (추천)")).toBeNull();
   });
 
   it("clicking a direction button notifies the page and clears the draft", async () => {
