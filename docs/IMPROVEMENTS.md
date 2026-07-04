@@ -39,6 +39,7 @@
 | F11 | 영어 → 한국어 (읽기 모드) | 기능 | 🔴 | M | 🚧 |
 | F12 | "내 영어 다듬기" 모드 | 기능 | 🟢 | M | 🔲 |
 | F13 | 자주 쓰는 템플릿/스니펫 | 기능 | 🟢 | M | 🔲 |
+| F14 | 영한 읽기 기록 (reading history) | 기능 | 🟡 | S | 🚧 |
 | P14 | 내 과거 번역을 few-shot으로 재활용 | 개인화 | 🔴 | L | ✅ |
 | P15 | 인라인 편집 + 교정 학습 | 개인화 | 🟡 | M | 🔲 |
 | P16 | As-you-type 번역 메모리 (bge-m3 + 옵트인 few-shot; P14/W6 통합) | 개인화 | 🔴 | L | ✅ |
@@ -153,6 +154,11 @@ B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣
 ### F13 · 자주 쓰는 템플릿/스니펫 — 🟢 M
 스탠드업 업데이트, PR 리뷰 요청, OOO/휴가 알림 등 반복 메시지 원클릭.
 **관련 코드:** 신규 `migrations/`(snippets), settings/메인 UI.
+
+### F14 · 영한 읽기 기록 (reading history) — 🟡 S — 🚧
+F11 읽기 모드로 의뢰한 영한 번역을 기록으로 남겨 목록에서 확인·삭제. 재사용(TM/few-shot) 없는 "의뢰 로그".
+**📐 설계안:** [`docs/reading-history-design.md`](./reading-history-design.md) — rev2(리뷰 2건 반영). 핵심 결정: **별도 `reading_history` 테이블로 완전 격리** → W9 캐시 방향 오염(P16 트랩)·TM·통계 반전이 애초에 안 생김. 컬럼은 **역할명 `source_text`/`target_text`**(언어명 반전 트랩 회피), 저장은 **`ctx.waitUntil` 백그라운드 + 완전결과만**, 검증은 **실-DB round-trip 테스트**(fake-DB 바인딩순서는 swap에 vacuous).
+**관련 코드:** `migrations/0007_*`(신규 테이블), `lib/reading-history.ts`(신규), `app/api/reading-history/route.ts`(신규), `app/reading-history/page.tsx`·`components/ReadingHistoryCard.tsx`(신규), `app/api/read/route.ts`(저장 배선), `components/Navigation.tsx`(탭).
 
 ---
 
