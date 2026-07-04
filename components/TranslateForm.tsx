@@ -102,23 +102,24 @@ export function TranslateForm({
         </button>
       </div>
 
-      <div className={isReading ? "" : "grid grid-cols-2 gap-4"}>
-        <div>
-          <label className="block text-sm font-medium mb-2">모델</label>
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="w-full p-3 border border-gray-200 rounded-md focus:outline-none focus:border-primary"
-          >
-            {MODELS.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        {/* Reading mode is style-less (comprehension, not outgoing tone). */}
-        {!isReading && (
+      {/* Reading mode has no model/style controls: it's locked to the cheap/fast
+          model (premium is pointless for comprehension) and is style-less. */}
+      {!isReading && (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">모델</label>
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="w-full p-3 border border-gray-200 rounded-md focus:outline-none focus:border-primary"
+            >
+              {MODELS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="block text-sm font-medium mb-2">스타일</label>
             <select
@@ -133,8 +134,8 @@ export function TranslateForm({
               ))}
             </select>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <div>
         <label className="block text-sm font-medium mb-2">

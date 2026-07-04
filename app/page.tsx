@@ -268,7 +268,8 @@ export default function HomePage() {
       ? []
       : tmMatches.filter((m) => selectedExampleIds.has(m.id)).map((m) => m.id);
     const body = isReading
-      ? JSON.stringify({ englishText: text, model })
+      // Reading is locked to the cheap default model server-side (no model sent).
+      ? JSON.stringify({ englishText: text })
       : JSON.stringify({ koreanText: text, model, style, exampleIds });
     try {
       const res = await fetch(url, {

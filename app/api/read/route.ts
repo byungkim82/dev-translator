@@ -16,8 +16,11 @@ const READING_STYLE = "reading";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as { englishText?: string; model?: string };
-    const resolvedModel = body.model || "gemini-flash-lite";
+    const body = (await request.json()) as { englishText?: string };
+    // Reading mode is locked to the cheap/fast default model — the premium model
+    // is pointless for comprehension and isn't offered in the reading UI. Hardcoded
+    // here (not read from the request) so it can't be bypassed by any client.
+    const resolvedModel = "gemini-flash-lite";
     const rawText = body.englishText;
 
     if (!rawText || typeof rawText !== "string" || !rawText.trim()) {
