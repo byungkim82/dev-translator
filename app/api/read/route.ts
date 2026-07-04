@@ -3,11 +3,14 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { streamGeminiText, cleanGeminiOutput } from "@/lib/ai/gemini";
 import { buildReadingPrompt } from "@/lib/prompts";
 import { encodeStreamEvent, type StreamEvent } from "@/lib/stream-protocol";
+import { generateId } from "@/lib/utils";
+import { insertReadingHistory } from "@/lib/reading-history";
 
-// F11: English → Korean reading mode. EPHEMERAL by design — NO cache, NO
-// persistence, NO embedding, NO TM/few-shot. This keeps the KO-centric storage/
-// cache/TM machinery completely untouched (see docs/F11-reading-mode-design.md,
-// decision C). Reuses the W7 NDJSON streaming protocol as-is (decision E/F).
+// F11: English → Korean reading mode. NO cache, NO embedding, NO TM/few-shot —
+// this keeps the KO-centric storage/cache/TM machinery completely untouched (see
+// docs/F11-reading-mode-design.md). Reuses the W7 NDJSON streaming protocol as-is.
+// The only persistence is a best-effort log to the ISOLATED reading_history table
+// (docs/reading-history-design.md) — the translations table is never touched.
 
 // Reading has no user-facing style; use the dedicated "reading" temperature key
 // added to STYLE_TEMPERATURES (0.3), NOT a KO→EN style key (avoids hidden coupling
@@ -28,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
     const englishText = rawText.trim();
 
-    const { env } = await getCloudflareContext();
+    const { env, ctx } = await getCloudflareContext();
     const cfEnv = env as CloudflareEnv;
     if (!cfEnv.GEMINI_API_KEY) {
       return NextResponse.json({ error: "GEMINI_API_KEY가 설정되지 않았습니다" }, { status: 500 });
@@ -60,10 +63,32 @@ export async function POST(request: NextRequest) {
             send({ type: "delta", text: next.value });
           }
 
+          const koreanOutput = cleanGeminiOutput(full);
+
           // done.english_text carries the final cleaned OUTPUT (Korean here). id and
-          // created_at are empty — reading mode persists nothing.
-          send({ type: "done", id: "", english_text: cleanGeminiOutput(full), truncated, created_at: "" });
+          // created_at stay empty — the client doesn't need the log row's id, and an
+          // empty id keeps the reading result's favorite button disabled.
+          send({ type: "done", id: "", english_text: koreanOutput, truncated, created_at: "" });
           controller.close();
+
+          // Persist to the ISOLATED reading_history log AFTER closing the stream —
+          // OFF the critical path (ctx.waitUntil keeps the worker alive past the
+          // response, same as the KO→EN background embedding). Only COMPLETE, non-
+          // empty results are logged: a truncated or empty read is skipped to avoid
+          // partial-as-complete / empty junk rows. Best-effort — a failed write just
+          // means no log. This is the ONLY new write; it never touches translations /
+          // W9 cache / TM / embeddings. Role-based columns: source = English input,
+          // target = Korean output.
+          if (koreanOutput.trim() && !truncated) {
+            ctx.waitUntil(
+              insertReadingHistory(cfEnv.DB, {
+                id: generateId(),
+                source_text: englishText,
+                target_text: koreanOutput,
+                created_at: new Date().toISOString(),
+              }).catch((e) => console.error("Reading-history persist failed:", e))
+            );
+          }
         } catch (err) {
           // The HTTP status is already 200, so surface mid-stream failures in-band.
           send({
