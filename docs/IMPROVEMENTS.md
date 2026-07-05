@@ -3,7 +3,7 @@
 > 업무용 한↔영 번역 도구의 개선 아이디어를 추적하는 살아있는 문서입니다.
 > 핵심 가치 기준: **"번역 → Slack 붙여넣기 10초 이내, 수작업 교정 최소화"**
 >
-> **마지막 업데이트:** 2026-06-25
+> **마지막 업데이트:** 2026-07-05
 > **사용법:** 항목을 진행할 때 상태를 갱신하고, 커밋 메시지/대화에서 `Q1`, `W6` 같은 ID로 참조하세요. 완료 항목은 아래 [완료 로그](#완료-로그)로 옮깁니다.
 > **작업 규칙:** 모든 개선은 가능한 한 **테스트 커버리지와 함께** 진행합니다 (Vitest 기반 = T18). 순수 로직 → 유닛 테스트, UI → 컴포넌트 테스트, API 라우트 → Workers 풀, 외부 API → `fetch` 모킹.
 
@@ -36,7 +36,7 @@
 | W8 | 자동 복사 + 토스트 (B1 연계) | 워크플로우 | 🔴 | S | ✅ |
 | W9 | 정확 일치 캐시 | 워크플로우 | 🟡 | S | ✅ |
 | W10 | 브라우저 확장 / 전역 단축키 | 워크플로우 | 🟢 | L | 🔲 |
-| F11 | 영어 → 한국어 (읽기 모드) | 기능 | 🔴 | M | 🚧 |
+| F11 | 영어 → 한국어 (읽기 모드) | 기능 | 🔴 | M | ✅ |
 | F12 | "내 영어 다듬기" 모드 | 기능 | 🟢 | M | 🔲 |
 | F13 | 자주 쓰는 템플릿/스니펫 | 기능 | 🟢 | M | 🔲 |
 | F14 | 영한 읽기 기록 (reading history) | 기능 | 🟡 | S | 🚧 |
@@ -55,9 +55,9 @@
 ### B1 · `auto_copy` 설정이 동작하지 않음 — 🔴 S — ✅
 `settings`에 `auto_copy`가 로드되지만(`app/page.tsx:41-45`) 번역 완료 흐름 `executeTranslation`에서 전혀 사용되지 않아 자동 복사 설정이 죽어 있던 문제. **W8과 함께 수정 완료** — 상세는 W8 참고.
 
-### B2 · DB에 잘못된 모델명 저장 — 🟡 S
-`app/api/translate/route.ts:63`에서 `model || "gemini-flash"`로 저장하지만 실제 기본 키는 `"gemini-flash-lite"`. 기본 모델로 번역 시 DB에 존재하지 않는 `gemini-flash`가 기록됨(통계/필터 왜곡 가능).
-**고치기:** fallback을 `"gemini-flash-lite"`로 통일.
+### B2 · DB에 잘못된 모델명 저장 — 🟡 S — ✅
+`app/api/translate/route.ts:63`에서 `model || "gemini-flash"`로 저장하던 문제(실제 기본 키는 `"gemini-flash-lite"`) — 기본 모델 번역 시 DB에 존재하지 않는 `gemini-flash`가 기록돼 통계/필터를 왜곡.
+**완료 범위:** fallback을 `resolvedModel`(`"gemini-flash-lite"`)로 통일. (커밋 `ab3a32f`, 2026-06-25)
 
 ---
 
@@ -137,15 +137,15 @@ B1 수정 포함. 번역이 끝나면 바로 클립보드에 들어가 붙여넣
 
 ## ✨ 새 기능 (Features)
 
-### F11 · 영어 → 한국어 (읽기 모드) — 🔴 M — 🚧
+### F11 · 영어 → 한국어 (읽기 모드) — 🔴 M — ✅
 워크플로우의 나머지 절반. 들어오는 영어 Slack 메시지를 빠르게 이해. 현재 단방향이라 절반만 커버.
 **📐 설계안:** [`docs/F11-reading-mode-design.md`](./F11-reading-mode-design.md) — rev3(리뷰 2회 반영). 핵심 결정: **읽기 모드는 일회성(ephemeral)** — DB 저장·캐시·TM·임베딩·스키마 무접촉이라 방향 오염(P16 트랩)·컬럼 반전을 원천 차단. 역방향은 **스타일 없는 단일 프롬프트** + **별도 `/api/read`**(기존 라우트 무접촉 = KO→EN 무회귀). 결정 A~G 사인오프 완료.
 **관련 코드:** `lib/prompts.ts`(`buildReadingPrompt`), `lib/ai/gemini.ts`(온도 키), `app/api/read/route.ts`(신규), `components/TranslateForm.tsx`(방향 토글), `app/page.tsx`(라우팅·direction 렌더).
-**진행 상황:** 🚧 **PR-a·PR-b 코드 완료** (배포·수동 E2E 남음).
-- **PR-a(백엔드)**: `buildReadingPrompt`(스타일 없는 단일 프롬프트, 영어 기술용어 보존) + `STYLE_TEMPERATURES` `reading=0.3`(순수 additive) + `app/api/read/route.ts`(일회성 스트리밍 — 캐시·persist·임베딩·examples 전부 없음). 무 UI·무회귀 선행.
-- **PR-b(프론트)**: `TranslateForm` 방향 토글(기본 한→영, 읽기 시 스타일 숨김·모델 유지·`koreanText`→`inputText`) + `page` direction 상태·`/api/read` 라우팅·TM 게이팅(읽기 미발동)·**방향 전환 시 본 번역 abort** + `TranslationResult` direction-aware(라벨/출력, 읽기 id="" → 즐겨찾기 비활성). auto_copy는 한→영에서만.
+**진행 상황:** ✅ **Phase 완료 — PR-a·PR-b 머지 + 배포·수동 E2E 검증 통과 (2026-07-05).** 방향 오염·컬럼 반전 트랩 없이 일회성 읽기 모드 동작 확인.
+- **PR-a(백엔드)**(`5e2ceb0`): `buildReadingPrompt`(스타일 없는 단일 프롬프트, 영어 기술용어 보존) + `STYLE_TEMPERATURES` `reading=0.3`(순수 additive) + `app/api/read/route.ts`(일회성 스트리밍 — 캐시·persist·임베딩·examples 전부 없음). 무 UI·무회귀 선행.
+- **PR-b(프론트)**(`7c84b45`): `TranslateForm` 방향 토글(기본 한→영, 읽기 시 스타일 숨김·모델 유지·`koreanText`→`inputText`) + `page` direction 상태·`/api/read` 라우팅·TM 게이팅(읽기 미발동)·**방향 전환 시 본 번역 abort** + `TranslationResult` direction-aware(라벨/출력, 읽기 id="" → 즐겨찾기 비활성). auto_copy는 한→영에서만.
 - **테스트:** 총 **131 통과**(신규 15: TranslateForm 5·TranslationResult 6·page 읽기 3·direction-toggle abort 1). abort 회귀 테스트는 **mock body를 signal에 배선 + 라벨 부재 단언**으로 비공허성 확보 — fix 제거 시 실패 확인. lint·tsc·`next build`(+OpenNext, `/api/read` 등록) 통과.
-- **남음:** 배포 후 수동 E2E(설계 §9) — 실 스트리밍·기술용어 영어 보존·TM 미표시·즐겨찾기 비활성·한→영 되돌림 무회귀.
+- **✅ 배포 + 수동 E2E 통과 (2026-07-05):** 설계 §9 체크리스트 전량 확인 — 실 스트리밍(첫 토큰 즉시), 기술용어 영어 보존, TM 패널 미표시·`/api/similar` 미호출, 즐겨찾기 비활성, 한→영 되돌림 무회귀. 문제 없음.
 
 ### F12 · "내 영어 다듬기" 모드 — 🟢 M
 직접 쓴 어색한 영어를 번역이 아니라 교정 + 뉘앙스 피드백(학습 효과).
@@ -241,3 +241,4 @@ F11 읽기 모드로 의뢰한 영한 번역을 기록으로 남겨 목록에서
 | Q6 | 출력 상한 8192 + 잘림 감지 경고 | 2026-06-26 | `2f51fd8` |
 | W7 | 번역 결과 스트리밍 (NDJSON, 4단계) — 배포 후 E2E 수동 검증 권장 | 2026-06-26 | `25cf22c`·`732fabf`·`4508678` |
 | P16 | As-you-type 번역 메모리 (bge-m3 핫패스 분리 + 옵트인 few-shot TM 패널; Phase 3 보류) — 배포·프로덕션 QA 통과 | 2026-06-30 | `200e837`·`a02ba5b`·`4e14613`·`9d138f1` |
+| F11 | 영어 → 한국어 읽기 모드 (일회성 `/api/read`, 방향 토글; 저장·캐시·TM·임베딩 무접촉) — 배포·수동 E2E 통과 | 2026-07-05 | `5e2ceb0`·`7c84b45` |
